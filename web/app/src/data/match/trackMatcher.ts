@@ -58,6 +58,7 @@ const DASH_PASSES = 3;
 
 const BRACKETED = /[([]([^()[\]]*)[)\]]/g;
 const BRACKETED_TEST = /[([]([^()[\]]*)[)\]]/;
+const BRACKETED_GLOBAL = /[([]([^()[\]]*)[)\]]/g;
 const DASH = /\s+[-–—|]+\s+/;
 const FEATURING = /\b(feat|ft|featuring|with)\b.*/g;
 const WORD_SPLIT = /[\s.·~〜]+/u;
@@ -119,6 +120,12 @@ const sameSet = <T>(a: Set<T>, b: Set<T>) => a.size === b.size && [...a].every((
 const union = <T>(...sets: Iterable<T>[]) => new Set(sets.flatMap((s) => [...s]));
 const intersect = <T>(a: Set<T>, b: Set<T>) => new Set([...a].filter((x) => b.has(x)));
 
+function sameTitle(wanted: string, got: string): boolean {
+  if (wanted === got) return true;
+  if (romajiOf(wanted) === romajiOf(got)) return true;
+  return [...wanted].length > 3 && [...got].length > 3 && (wanted.includes(got) || got.includes(wanted));
+}
+
 export function normalize(text: string): string {
   return text
     .normalize('NFKC')
@@ -142,12 +149,42 @@ export function queries(target: MatchTarget): string[] {
       ? latin
       : scriptMates(target.title).find((s) => s.trim() && s !== title);
   if (otherScript) out.push(otherScript);
+  out.push(...explicitScriptAliases(target.title, target.artist ?? '').filter((alias) => alias !== title));
   return [...new Set(out)];
 }
 
 export function searchableTitle(title: string, artist = ''): string {
   const parts = parseTitle(title, artist);
   return [...parts.words, ...parts.versions].join(' ');
+}
+
+/** Explicit Japanese/Latin title pairs are aliases, not packaging. */
+function explicitScriptAliases(raw: string, artist: string): string[] {
+  const text = normalize(raw);
+  const bracketed = [...text.matchAll(BRACKETED_GLOBAL)].map((match) => match[1] ?? '');
+  const segments = [...new Set([text.replace(BRACKETED_GLOBAL, ' '), ...bracketed, ...text.split(DASH)])]
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  const titles = segments.flatMap((segment) => {
+    if (isArtistName(segment, artist)) return [];
+    const title = searchableTitle(segment, artist);
+    return title ? [{ segment, title }] : [];
+  });
+  const aliases = new Set<string>();
+  titles.forEach((left, index) => {
+    titles.slice(index + 1).forEach((right) => {
+      const leftIsCjk = CJK.test(left.segment);
+      const rightIsCjk = CJK.test(right.segment);
+      const oppositeScripts =
+        (leftIsCjk && !rightIsCjk && hasFilingLatin(right.segment)) ||
+        (rightIsCjk && !leftIsCjk && hasFilingLatin(left.segment));
+      if (oppositeScripts) {
+        aliases.add(left.title);
+        aliases.add(right.title);
+      }
+    });
+  });
+  return [...aliases];
 }
 
 export function primaryArtist(artist: string): string {
@@ -181,11 +218,17 @@ export function score(candidate: MatchCandidate, target: MatchTarget): number | 
   const wanted = parseTitle(target.title, target.artist ?? '');
   const got = parseTitle(candidate.title, candidate.artist);
   if (!wanted.core.trim() || !got.core.trim()) return null;
-  const isTitleMatch =
-    wanted.core === got.core ||
-    romajiOf(wanted.core) === romajiOf(got.core) ||
-    (!([...wanted.core].length <= 3 || [...got.core].length <= 3) &&
-      (wanted.core.includes(got.core) || got.core.includes(wanted.core)));
+  const wantedTitles = [
+    wanted.core,
+    ...explicitScriptAliases(target.title, target.artist ?? '').map((alias) => parseTitle(alias, target.artist ?? '').core),
+  ];
+  const gotTitles = [
+    got.core,
+    ...explicitScriptAliases(candidate.title, candidate.artist).map((alias) => parseTitle(alias, candidate.artist).core),
+  ];
+  const isTitleMatch = wantedTitles.some((wantedTitle) =>
+    gotTitles.some((gotTitle) => sameTitle(wantedTitle, gotTitle)),
+  );
   if (!isTitleMatch) return null;
 
   const albumMarks = albumVersionMarkers(candidate.album);

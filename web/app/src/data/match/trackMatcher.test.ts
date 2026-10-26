@@ -138,4 +138,21 @@ describe('TrackMatcher', () => {
       'paniyon sa',
     ]);
   });
+
+  it('searches and matches an explicit romaji alias for a Japanese title', () => {
+    const target = { title: '夜に駆ける (Yoru ni Kakeru)', artist: 'YOASOBI', durationSec: 260 };
+    expect(queries(target)).toEqual(['夜に駆ける yoasobi', '夜に駆ける', 'yoru ni kakeru']);
+    expect(matches(song('Yoru ni Kakeru', 'YOASOBI', '4:20'), target.title, target.artist, target.durationSec)).toBe(true);
+    expect(
+      matches(song('夜に駆ける (Yoru ni Kakeru)', 'YOASOBI', '4:20'), '夜に駆ける', 'YOASOBI', 260),
+    ).toBe(true);
+    const translated = '夜に駆ける (Racing into the Night)';
+    expect(queries({ title: translated, artist: 'YOASOBI' })).toEqual([
+      '夜に駆ける yoasobi',
+      '夜に駆ける',
+      'racing into the night',
+    ]);
+    expect(matches(song('Racing into the Night', 'YOASOBI', '4:20'), translated, 'YOASOBI', 260)).toBe(true);
+    expect(matches(song('Yoru ni Kakeru (Live)', 'YOASOBI', '4:20'), target.title, target.artist, 260)).toBe(false);
+  });
 });

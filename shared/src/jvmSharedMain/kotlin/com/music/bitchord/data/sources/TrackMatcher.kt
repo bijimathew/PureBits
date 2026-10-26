@@ -78,7 +78,8 @@ object TrackMatcher {
      * Two queries, not one: the second drops the artist, for the catalogues
      * that credit a track to the composer or the film rather than the singer
      * and would otherwise score every result down. A kana title gets a third,
-     * in the other script (below).
+     * in the other script (below); an explicit Japanese/Latin alternate gets
+     * its own query as well.
      */
     fun queries(target: Target): List<String> {
         val title = searchableTitle(target.title, target.artist)
@@ -97,12 +98,45 @@ object TrackMatcher {
         val otherScript = latin.takeIf { it.isNotBlank() && it != title && it.all { c -> c in LATIN_QUERY_CHARS } }
             ?: scriptMates(target.title).firstOrNull { it.isNotBlank() && it != title }
         otherScript?.let { out += it }
+        out += explicitScriptAliases(target.title, target.artist).filter { it != title }
         return out.distinct()
     }
 
     /** The title with the packaging taken off, version markers kept. */
     internal fun searchableTitle(title: String, artist: String = ""): String =
         parseTitle(title, artist).let { (it.words + it.versions).joinToString(" ") }
+
+    /**
+     * Explicit Japanese/Latin title pairs are aliases, not packaging. Keep
+     * them available when a catalogue files the recording under either one.
+     */
+    private fun explicitScriptAliases(raw: String, artist: String): List<String> {
+        val text = normalize(raw)
+        val bracketed = BRACKETED.findAll(text).map { it.groupValues[1] }.toList()
+        val segments = (listOf(BRACKETED.replace(text, " ")) + bracketed + DASH.split(text))
+            .map { it.trim() }
+            .filter(String::isNotBlank)
+            .distinct()
+        val titles = segments.mapNotNull { segment ->
+            if (isArtistName(segment, artist)) return@mapNotNull null
+            searchableTitle(segment, artist).takeIf(String::isNotBlank)?.let { segment to it }
+        }
+        val aliases = linkedSetOf<String>()
+        for ((index, left) in titles.withIndex()) {
+            for (right in titles.drop(index + 1)) {
+                val leftIsCjk = containsCjkScript(left.first)
+                val rightIsCjk = containsCjkScript(right.first)
+                val oppositeScripts =
+                    (leftIsCjk && !rightIsCjk && hasFilingLatin(right.first)) ||
+                    (rightIsCjk && !leftIsCjk && hasFilingLatin(left.first))
+                if (oppositeScripts) {
+                    aliases += left.second
+                    aliases += right.second
+                }
+            }
+        }
+        return aliases.toList()
+    }
 
     /** The first credited artist — who a catalogue is most likely to file the track under. */
     internal fun primaryArtist(artist: String): String =
@@ -206,17 +240,12 @@ object TrackMatcher {
         val wanted = parseTitle(target.title, target.artist)
         val got = parseTitle(candidate.title, candidate.artist)
         if (wanted.core.isBlank() || got.core.isBlank()) return null
-        // Same word, different script: katakana コイコガレ vs romaji
-        // koikogare. Hepburn transliteration bridges kana; kanji has no
-        // algorithmic reading and stays exact-only (mixed titles carry their
-        // romaji tail instead, and English loans like ドア/door don't
-        // transliterate to each other either). Past that, a guarded
-        // containment absorbs minor punctuation and symbol differences.
-        val isTitleMatch = when {
-            wanted.core == got.core -> true
-            romajiOf(wanted.core) == romajiOf(got.core) -> true
-            wanted.core.length <= 3 || got.core.length <= 3 -> false
-            else -> wanted.core.contains(got.core) || got.core.contains(wanted.core)
+        val wantedTitles = listOf(wanted.core) +
+            explicitScriptAliases(target.title, target.artist).map { parseTitle(it, target.artist).core }
+        val gotTitles = listOf(got.core) +
+            explicitScriptAliases(candidate.title, candidate.artist).map { parseTitle(it, candidate.artist).core }
+        val isTitleMatch = wantedTitles.any { wantedTitle ->
+            gotTitles.any { gotTitle -> sameTitle(wantedTitle, gotTitle) }
         }
         if (!isTitleMatch) return null
         // Direction matters both ways round: asking for the album cut must not
@@ -427,14 +456,7 @@ object TrackMatcher {
         // words. Standard word splitting and non-alphanumeric filtering fragment
         // these titles into empty or broken strings, so CJK titles keep their
         // raw character sequence intact (stripping only punctuation and whitespace).
-        val containsCJK = text.any {
-            Character.UnicodeBlock.of(it) in setOf(
-                Character.UnicodeBlock.HIRAGANA,
-                Character.UnicodeBlock.KATAKANA,
-                Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
-                Character.UnicodeBlock.HANGUL_SYLLABLES
-            )
-        }
+        val containsCJK = containsCjkScript(text)
 
         var words = text.split(WORD_SPLIT)
             .map { it.replace(NON_ALNUM, "") }
@@ -526,6 +548,22 @@ object TrackMatcher {
             .replace("&", " and ")
             .replace(CJK_OPEN, "(")
             .replace(CJK_CLOSE, ")")
+
+    private fun sameTitle(wanted: String, got: String): Boolean = when {
+        wanted == got -> true
+        romajiOf(wanted) == romajiOf(got) -> true
+        wanted.length <= 3 || got.length <= 3 -> false
+        else -> wanted.contains(got) || got.contains(wanted)
+    }
+
+    private fun containsCjkScript(text: String): Boolean = text.any {
+        Character.UnicodeBlock.of(it) in setOf(
+            Character.UnicodeBlock.HIRAGANA,
+            Character.UnicodeBlock.KATAKANA,
+            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
+            Character.UnicodeBlock.HANGUL_SYLLABLES,
+        )
+    }
 
     /**
      * Latin that actually files the track. A head holding nothing but a take

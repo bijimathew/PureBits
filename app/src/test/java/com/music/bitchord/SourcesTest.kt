@@ -1378,8 +1378,56 @@ class SourcesTest {
     @Test
     fun `asks for the romaji filing of a mixed-script title`() {
         assertEquals(
-            listOf("dai zero kan 10-feet", "dai zero kan"),
+            listOf("dai zero kan 10-feet", "dai zero kan", "第ゼロ感"),
             TrackMatcher.queries(TrackMatcher.Target("第ゼロ感 - Dai Zero Kan", "10-FEET")),
+        )
+    }
+
+    @Test
+    fun `asks for an explicitly parenthesized romaji title`() {
+        assertEquals(
+            listOf("夜に駆ける yoasobi", "夜に駆ける", "yoru ni kakeru"),
+            TrackMatcher.queries(TrackMatcher.Target("夜に駆ける (Yoru ni Kakeru)", "YOASOBI")),
+        )
+    }
+
+    @Test
+    fun `matches Japanese titles by an explicit romaji alias`() {
+        assertTrue(
+            matches(
+                song("Yoru ni Kakeru", "YOASOBI", "4:20"),
+                title = "夜に駆ける (Yoru ni Kakeru)",
+                artist = "YOASOBI",
+                durationSec = 260,
+            ),
+        )
+        assertTrue(
+            matches(
+                song("夜に駆ける (Yoru ni Kakeru)", "YOASOBI", "4:20"),
+                title = "夜に駆ける",
+                artist = "YOASOBI",
+                durationSec = 260,
+            ),
+        )
+        assertEquals(
+            listOf("夜に駆ける yoasobi", "夜に駆ける", "racing into the night"),
+            TrackMatcher.queries(TrackMatcher.Target("夜に駆ける (Racing into the Night)", "YOASOBI")),
+        )
+        assertTrue(
+            matches(
+                song("Racing into the Night", "YOASOBI", "4:20"),
+                title = "夜に駆ける (Racing into the Night)",
+                artist = "YOASOBI",
+                durationSec = 260,
+            ),
+        )
+        assertFalse(
+            matches(
+                song("Yoru ni Kakeru (Live)", "YOASOBI", "4:20"),
+                title = "夜に駆ける (Yoru ni Kakeru)",
+                artist = "YOASOBI",
+                durationSec = 260,
+            ),
         )
     }
 
