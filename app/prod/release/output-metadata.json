@@ -1,0 +1,82 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "APK",
+    "kind": "Directory"
+  },
+  "applicationId": "com.music.bitchord",
+  "variantName": "prodRelease",
+  "elements": [
+    {
+      "type": "UNIVERSAL",
+      "filters": [],
+      "attributes": [],
+      "versionCode": 30,
+      "versionName": "1.8.2",
+      "outputFile": "app-prod-universal-release.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "x86_64"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 30,
+      "versionName": "1.8.2",
+      "outputFile": "app-prod-x86_64-release.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "armeabi-v7a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 30,
+      "versionName": "1.8.2",
+      "outputFile": "app-prod-armeabi-v7a-release.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "arm64-v8a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 30,
+      "versionName": "1.8.2",
+      "outputFile": "app-prod-arm64-v8a-release.apk"
+    }
+  ],
+  "elementType": "File",
+  "baselineProfiles": [
+    {
+      "minApi": 28,
+      "maxApi": 30,
+      "baselineProfiles": [
+        "baselineProfiles/1/app-prod-universal-release.dm",
+        "baselineProfiles/1/app-prod-x86_64-release.dm",
+        "baselineProfiles/1/app-prod-armeabi-v7a-release.dm",
+        "baselineProfiles/1/app-prod-arm64-v8a-release.dm"
+      ]
+    },
+    {
+      "minApi": 31,
+      "maxApi": 2147483647,
+      "baselineProfiles": [
+        "baselineProfiles/0/app-prod-universal-release.dm",
+        "baselineProfiles/0/app-prod-x86_64-release.dm",
+        "baselineProfiles/0/app-prod-armeabi-v7a-release.dm",
+        "baselineProfiles/0/app-prod-arm64-v8a-release.dm"
+      ]
+    }
+  ],
+  "minSdkVersionForDexing": 26
+}

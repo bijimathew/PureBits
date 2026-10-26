@@ -116,7 +116,7 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "com.dev.bitchord"
-            resValue("string", "app_name", "BitChord Dev")
+            resValue("string", "app_name", "PureBits Dev")
         }
         create("prod") {
             dimension = "env"
