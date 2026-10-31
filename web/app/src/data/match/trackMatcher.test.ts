@@ -155,4 +155,13 @@ describe('TrackMatcher', () => {
     expect(matches(song('Racing into the Night', 'YOASOBI', '4:20'), translated, 'YOASOBI', 260)).toBe(true);
     expect(matches(song('Yoru ni Kakeru (Live)', 'YOASOBI', '4:20'), target.title, target.artist, 260)).toBe(false);
   });
+
+  it('matches a bracketed CJK translation against its Latin filing', () => {
+    expect(matches(song('Love', 'Singer', '2:53'), '愛(Love)', 'Singer', 174)).toBe(true);
+    expect(matches(song('Love (愛)', 'Singer', '2:53'), '愛', 'Singer', 174)).toBe(true);
+    // Same-script packaging must not rescue a different title.
+    expect(matches(song('Film Name', 'Some Artist', '4:07'), 'Song Name (From "Film Name")', 'Singer', 247)).toBe(false);
+    // One word of a longer aside is not the whole title.
+    expect(matches(song('Night', 'Singer', '4:20'), '夜に駆ける (Racing Into The Night)', 'Singer', 260)).toBe(false);
+  });
 });

@@ -124,8 +124,8 @@ object TrackMatcher {
         val aliases = linkedSetOf<String>()
         for ((index, left) in titles.withIndex()) {
             for (right in titles.drop(index + 1)) {
-                val leftIsCjk = containsCjkScript(left.first)
-                val rightIsCjk = containsCjkScript(right.first)
+                val leftIsCjk = containsCJKChar(left.first)
+                val rightIsCjk = containsCJKChar(right.first)
                 val oppositeScripts =
                     (leftIsCjk && !rightIsCjk && hasFilingLatin(right.first)) ||
                     (rightIsCjk && !leftIsCjk && hasFilingLatin(left.first))
@@ -139,8 +139,10 @@ object TrackMatcher {
     }
 
     /** The first credited artist — who a catalogue is most likely to file the track under. */
-    internal fun primaryArtist(artist: String): String =
-        normalize(artist).split(ARTIST_SEPARATORS).firstOrNull()?.trim().orEmpty()
+    internal fun primaryArtist(artist: String): String {
+        val primary = normalize(artist).split(ARTIST_SEPARATORS).firstOrNull()?.trim().orEmpty()
+        return primary.takeUnless { it in YOUTUBE_TYPE_LABELS }.orEmpty()
+    }
 
     /** Whether both credits name at least one of the same artists. */
     fun sharesArtist(wanted: String, got: String): Boolean {
@@ -244,9 +246,12 @@ object TrackMatcher {
             explicitScriptAliases(target.title, target.artist).map { parseTitle(it, target.artist).core }
         val gotTitles = listOf(got.core) +
             explicitScriptAliases(candidate.title, candidate.artist).map { parseTitle(it, candidate.artist).core }
-        val isTitleMatch = wantedTitles.any { wantedTitle ->
-            gotTitles.any { gotTitle -> sameTitle(wantedTitle, gotTitle) }
-        }
+        val isTitleMatch = sameTitle(wanted.core, got.core) ||
+            wantedTitles.any { wantedTitle ->
+                gotTitles.any { gotTitle ->
+                    wantedTitle == gotTitle || romajiOf(wantedTitle) == romajiOf(gotTitle)
+                }
+            } || isTranslationMatch(wanted, got)
         if (!isTitleMatch) return null
         // Direction matters both ways round: asking for the album cut must not
         // land on the live take, and asking for the live take must not land on
@@ -405,6 +410,15 @@ object TrackMatcher {
         val context = mutableSetOf<String>()
         var text = normalize(raw)
 
+        // A guest credit printed in Portuguese — YouTube Music Brazil writes
+        // "O Mundo É Mal (part. Clara Lima)" — is a feat. credit, and `part`
+        // alone is a [VERSION_WORDS] marker: left to the bracket pass, the
+        // aside comes back out as the query "… part", a word no catalogue
+        // files a track under. The dot is what tells it apart from an English
+        // title ("Part of Me"), and a numeral after it is still the title
+        // ("Part. 2").
+        text = text.replace(PT_BR_FEATURING, " ")
+
         // Bracketed asides, innermost first: "(From "Satyamev Jayate")",
         // "[Official Audio]", "(Live at Wembley)".
         repeat(BRACKET_PASSES) {
@@ -456,7 +470,7 @@ object TrackMatcher {
         // words. Standard word splitting and non-alphanumeric filtering fragment
         // these titles into empty or broken strings, so CJK titles keep their
         // raw character sequence intact (stripping only punctuation and whitespace).
-        val containsCJK = containsCjkScript(text)
+        val containsCJK = text.any { Character.UnicodeBlock.of(it) in CJK_BLOCKS }
 
         var words = text.split(WORD_SPLIT)
             .map { it.replace(NON_ALNUM, "") }
@@ -519,7 +533,37 @@ object TrackMatcher {
             versions += marks
             return
         }
-        context += words.filter { it.length > 2 && it !in NOISE_WORDS }
+        // A single CJK syllable is a whole title: the length gate exists
+        // for Latin glue words and must not drop it.
+        context += words.filter { (it.length > 2 || containsCJKChar(it)) && it !in NOISE_WORDS }
+    }
+
+    /**
+     * Whether a bracketed aside is the same title in another script rather
+     * than packaging around it.
+     *
+     * True when one core is CJK-only, the other is Latin, and the other's
+     * aside is that core in full (spaced CJK joins back to it). Same-script
+     * asides never qualify.
+     */
+    internal fun isTranslationMatch(wanted: TitleParts, got: TitleParts): Boolean {
+        val wantedCJK = containsCJKChar(wanted.core) && !hasFilingLatin(wanted.core)
+        val gotCJK = containsCJKChar(got.core) && !hasFilingLatin(got.core)
+        val wantedLatin = hasFilingLatin(wanted.core)
+        val gotLatin = hasFilingLatin(got.core)
+        // Checking both asides covers both orders: Latin in the CJK row's
+        // brackets, and CJK in the Latin row's brackets. The aside must be
+        // the whole title — one word of "(Racing Into The Night)" is not the
+        // song "Night".
+        if ((wantedCJK && gotLatin) || (gotCJK && wantedLatin)) {
+            if (wanted.context.joinToString("") == got.core) return true
+            if (got.context.joinToString("") == wanted.core) return true
+        }
+        return false
+    }
+
+    private fun containsCJKChar(text: String): Boolean = text.any {
+        Character.UnicodeBlock.of(it) in CJK_BLOCKS
     }
 
     /** Whether [text] is nothing but (part of) [artist] — the "Artist - Title" upload shape. */
@@ -554,15 +598,6 @@ object TrackMatcher {
         romajiOf(wanted) == romajiOf(got) -> true
         wanted.length <= 3 || got.length <= 3 -> false
         else -> wanted.contains(got) || got.contains(wanted)
-    }
-
-    private fun containsCjkScript(text: String): Boolean = text.any {
-        Character.UnicodeBlock.of(it) in setOf(
-            Character.UnicodeBlock.HIRAGANA,
-            Character.UnicodeBlock.KATAKANA,
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
-            Character.UnicodeBlock.HANGUL_SYLLABLES,
-        )
     }
 
     /**
@@ -851,9 +886,27 @@ object TrackMatcher {
     private const val BRACKET_PASSES = 3
     private const val DASH_PASSES = 3
 
+    private val CJK_BLOCKS = setOf(
+        Character.UnicodeBlock.HIRAGANA,
+        Character.UnicodeBlock.KATAKANA,
+        Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
+        Character.UnicodeBlock.HANGUL_SYLLABLES,
+    )
+
     private val BRACKETED = Regex("""[(\[]([^()\[\]]*)[)\]]""")
     private val DASH = Regex("""\s+[-–—|]+\s+""")
     private val FEATURING = Regex("""\b(feat|ft|featuring|with)\b.*""")
+    /**
+     * The Portuguese spelling of the same credit, see [parseTitle]. Only the
+     * dotted form and an explicit `part esp.` count: an undotted `part` is
+     * English often enough ("Part of Me") to empty a real title. A numeral or
+     * roman numeral after the marker is still the title ("Part. 2", "Part II"),
+     * and `parte` is a different word.
+     */
+    private val PT_BR_FEATURING = Regex(
+        """\bpart\.\s+(?!(?:\d|[ivx]+\b))[^)\]]*[)\]]?|\bpart\s+(?:esp\.?|especial)\b[^)\]]*[)\]]?""",
+        RegexOption.IGNORE_CASE,
+    )
     /** `~` and the wave dash `〜` join words in Japanese titles ("真夜中のドア〜stay"). */
     private val WORD_SPLIT = Regex("""[\s.·~〜]+""")
     /**
@@ -956,6 +1009,11 @@ object TrackMatcher {
         "radioversion", "radioedit", "stereoversion", "monoversion",
         "studioversion", "fullversion", "standardversion", "explicitversion",
         "deluxeversion", "originaltrack",
+    )
+
+    /** Where YouTube Music prints a type instead of an artist: "… — Música". */
+    private val YOUTUBE_TYPE_LABELS = setOf(
+        "música", "musica", "vídeo", "video", "song", "album", "álbum", "artista", "artist",
     )
 
     /** Packaging words, worth nothing as a tie-break because everything has them. */
