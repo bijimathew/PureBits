@@ -198,4 +198,8 @@
     <string name="search_library_empty">आपके लोकल म्यूज़िक फ़ोल्डर के गाने खोजें.</string>
     <string name="search_library_hint">गाने, कलाकार और एल्बम</string>
     <string name="search_library_no_results">लोकल म्यूज़िक में “%1$s” से मेल खाता कुछ नहीं.</string>
+    <string name="next_addon">अगले स्रोत में खोजें</string>
+    <string name="next_addon_description">इस गाने को अगले ऐडऑन स्रोत में खोजें</string>
+    <string name="next_addon_searching">अगले स्रोत में खोज जारी है…</string>
+    <string name="automix_overview_unavailable">अभी कोई Automix ट्रांज़िशन आने वाला नहीं है</string>
 </resources>

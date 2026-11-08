@@ -1460,4 +1460,10 @@
     <string name="diwali_title">BitChord की ओर से दीपावली की शुभकामनाएँ</string>
     <string name="diwali_subtitle">रोशनी का यह त्योहार आपके घर को खुशियों से और आपके दिनों को संगीत से भर दे।</string>
     <string name="diwali_cta">चलो जश्न मनाएँ</string>
+    <string name="next_addon_no_match">बाकी उपलब्ध ऐडऑन में कोई मेल खाता गाना नहीं मिला। मौजूदा स्रोत नहीं बदला गया।</string>
+    <string name="next_addon_failed">ऐडऑन नहीं बदला जा सका। फिर से कोशिश करें।</string>
+    <string name="next_addon_playing">%1$s से चल रहा है</string>
+    <string name="next_addon_phone_only">जब गाना इसी फ़ोन पर चल रहा हो और कोई ट्रांज़िशन न हो, तब दूसरा स्रोत आज़माएँ।</string>
+    <string name="next_addon_unknown_cache">पहले से कैश में मौजूद इस गाने में ऐडऑन की जानकारी नहीं है। ऑडियो कैश साफ़ करें, गाना फिर से चलाएँ और दोबारा कोशिश करें।</string>
+    <string name="automix_overview">Automix का अवलोकन</string>
 </resources>

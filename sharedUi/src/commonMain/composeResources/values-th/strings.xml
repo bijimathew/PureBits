@@ -198,4 +198,8 @@
     <string name="search_library_empty">ค้นหาเพลงในโฟลเดอร์เพลงในเครื่องของคุณ</string>
     <string name="search_library_hint">เพลง ศิลปิน และอัลบั้ม</string>
     <string name="search_library_no_results">ไม่มีอะไรในเพลงในเครื่องตรงกับ “%1$s”</string>
+    <string name="next_addon">ค้นหาในแหล่งถัดไป</string>
+    <string name="next_addon_description">ค้นหาเพลงนี้ในแหล่งส่วนเสริมถัดไป</string>
+    <string name="next_addon_searching">กำลังค้นหาในแหล่งถัดไป…</string>
+    <string name="automix_overview_unavailable">ไม่มีการเปลี่ยนเพลงด้วย Automix ที่กำลังจะมาถึง</string>
 </resources>

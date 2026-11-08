@@ -1,6 +1,5 @@
 package com.music.bitchord.ui.player
 
-import com.music.bitchord.wear.WearBridge
 import android.content.Context
 import android.database.ContentObserver
 import android.media.AudioManager
@@ -137,10 +136,9 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
     override fun rememberAudioOutputs(): List<AudioOutputDevice> {
         val outputs = rememberAndroidAudioOutputs()
         val cast by CastController.state.collectAsStateWithLifecycle()
-        val watch by WearBridge.watchOutput.collectAsStateWithLifecycle()
         // While a receiver is the speaker no output of this phone is the one
-        // playing, so none of them is lit; the Cast or watch row is.
-        return if (cast.casting || watch.active) outputs.map { it.copy(isActive = false) } else outputs
+        // playing, so none of them is lit; the Cast row is.
+        return if (cast.casting) outputs.map { it.copy(isActive = false) } else outputs
     }
 
     @Composable
@@ -151,23 +149,14 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         // is let go of, and the music carries on here if it was playing.
         if (CastController.state.value.casting) CastController.disconnect(resumeHere = true)
         AudioRouting.select(id)
-        WearBridge.leaveWatchOutput()
     }
 
-    override val watchOutput: StateFlow<WatchOutputUi> by lazy {
-        WearBridge.watchOutput
-            .map { WatchOutputUi(available = it.available, name = it.name, active = it.active) }
-            .stateIn(scope, SharingStarted.Eagerly, WatchOutputUi())
-    }
+    // Keep the shared player contract; PureBits has no watch output.
+    override val watchOutput: StateFlow<WatchOutputUi> = MutableStateFlow(WatchOutputUi()).asStateFlow()
 
-    override fun refreshWatchOutput() = WearBridge.refreshWatchOutput(app)
+    override fun refreshWatchOutput() = Unit
 
-    override fun selectWatchOutput() {
-        // One speaker at a time: a receiver lets go first, quietly, and the
-        // watch picks the queue up from where the phone's player is.
-        if (CastController.state.value.casting) CastController.disconnect(resumeHere = false)
-        WearBridge.selectWatchOutput()
-    }
+    override fun selectWatchOutput() = Unit
 
     override val outputFormat: StateFlow<OutputFormatUi> by lazy {
         combine(AudioOutputStatus.current, BitPerfectOutput.status) { status, bitPerfect ->
@@ -295,12 +284,10 @@ private class CastAwareVolume(
         system.level,
         CastController.volume,
         CastController.state.map { it.casting },
-        WearBridge.watchOutput,
         DacVolume.level,
-    ) { phone, receiver, casting, watch, dac ->
+    ) { phone, receiver, casting, dac ->
         when {
             casting -> receiver
-            watch.active -> watch.volume
             // Direct USB: the music stream no longer reaches the DAC, so its
             // own hardware volume is the only one that means anything.
             dac != null -> dac
@@ -312,7 +299,6 @@ private class CastAwareVolume(
     override fun set(level: Float) {
         when {
             CastController.state.value.casting -> CastController.setVolume(level)
-            WearBridge.watchOutput.value.active -> WearBridge.setWatchVolume(level)
             DacVolume.level.value != null -> DacVolume.set(level)
             else -> system.set(level)
         }

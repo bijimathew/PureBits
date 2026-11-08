@@ -198,4 +198,8 @@
     <string name="search_library_empty">Busca las canciones de tu carpeta de Música local.</string>
     <string name="search_library_hint">Canciones, artistas y álbumes</string>
     <string name="search_library_no_results">Nada en Música local coincide con “%1$s”.</string>
+    <string name="next_addon">Buscar en la siguiente fuente</string>
+    <string name="next_addon_description">Buscar esta canción en la siguiente fuente de complementos</string>
+    <string name="next_addon_searching">Buscando en la siguiente fuente…</string>
+    <string name="automix_overview_unavailable">No hay ninguna transición de Automix próxima</string>
 </resources>

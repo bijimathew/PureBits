@@ -1332,4 +1332,9 @@
     <string name="diwali_title">BitChord wishes you a Happy Diwali</string>
     <string name="diwali_subtitle">May this festival of lights fill your home with joy and your days with music.</string>
     <string name="diwali_cta">Let\'s Celebrate</string>
+    <string name="next_addon_no_match">No matching song found in the remaining eligible addons. Current source unchanged.</string>
+    <string name="next_addon_failed">Could not switch addon. Try again.</string>
+    <string name="next_addon_playing">Playing from %1$s</string>
+    <string name="next_addon_phone_only">Try another source when playback is on this phone and no transition is running.</string>
+    <string name="next_addon_unknown_cache">This older cached song has no addon details. Clear the audio cache, replay it, and try again.</string>
 </resources>

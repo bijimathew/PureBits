@@ -395,6 +395,68 @@ object SourceResolver {
     }
 
     /**
+     * Finds the same recording in the next enabled addon after [currentSourceId].
+     *
+     * This is an explicit rejection of the current source, so source order wins
+     * over response speed or quality. Earlier addons are visited after wrapping,
+     * and [excludedSourceIds] keeps rejected or failed sources out of later taps.
+     */
+    suspend fun nextAddon(
+        target: TrackMatcher.Target,
+        currentSourceId: String?,
+        excludedSourceIds: Set<String>,
+        onAttempt: (String) -> Unit = {},
+    ): SourceStream? = nextAddonFrom(
+        sources = SourceRegistry.activeForPlayback(),
+        target = target,
+        request = requestForNow(),
+        currentSourceId = currentSourceId,
+        excludedSourceIds = excludedSourceIds,
+        onAttempt = onAttempt,
+    )
+
+    /** [sources] has already passed the enabled and connection-quality gates. */
+    internal suspend fun nextAddonFrom(
+        sources: List<MusicSource>,
+        target: TrackMatcher.Target,
+        request: StreamRequest,
+        currentSourceId: String?,
+        excludedSourceIds: Set<String>,
+        onAttempt: (String) -> Unit = {},
+        timeoutMs: Long = NEXT_ADDON_LOOKUP_MS,
+    ): SourceStream? {
+        if (target.title.isBlank() || target.isVideo) return null
+        for (source in nextAddonCandidates(sources, currentSourceId, excludedSourceIds)) {
+            onAttempt(source.configId)
+            val stream = withTimeoutOrNull(timeoutMs) {
+                matchAndStream(
+                    source = source,
+                    target = target,
+                    request = request,
+                    waitForAll = true,
+                    strictLength = target.durationSec != null,
+                    requireSharedArtist = true,
+                    driftSec = upgradeSlackSec(),
+                )
+            }
+            if (stream != null) return stream
+        }
+        return null
+    }
+
+    internal fun nextAddonCandidates(
+        sources: List<MusicSource>,
+        currentSourceId: String?,
+        excludedSourceIds: Set<String>,
+    ): List<MusicSource> {
+        val current = sources.indexOfFirst { it.configId == currentSourceId }
+        val ordered = if (current >= 0) sources.drop(current + 1) + sources.take(current) else sources
+        return ordered.filter {
+            it.kind == SourceKind.ADDON && it.configId != currentSourceId && it.configId !in excludedSourceIds
+        }
+    }
+
+    /**
      * The reliable last rung for a source-backed queue item whose chosen stream
      * failed in the player.
      *
@@ -1492,6 +1554,9 @@ object SourceResolver {
      * somewhere, and the extra rows cost one response body, not one request.
      */
     private const val MATCH_CANDIDATES = 15
+
+    /** A stalled addon must leave time for the next configured source to answer. */
+    private const val NEXT_ADDON_LOOKUP_MS = 20_000L
 
     /**
      * How many of the matching rows are worth actually opening.

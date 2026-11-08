@@ -1307,4 +1307,13 @@
     <string name="bit_perfect_status_inexact">%1$s · 정확하지 않음: 이 소스는 무손실 PCM이 아닙니다</string>
     <string name="bit_perfect_status_waiting">지원되는 출력에서 무손실 트랙을 기다리는 중</string>
     <string name="bit_perfect_status_unavailable">이 트랙에서 사용할 수 없음(%1$s)</string>
+    <string name="next_addon_no_match">남아 있는 사용 가능한 애드온에서 일치하는 노래를 찾지 못했습니다. 현재 소스는 변경되지 않습니다.</string>
+    <string name="next_addon_failed">애드온을 전환할 수 없습니다. 다시 시도하세요.</string>
+    <string name="next_addon_playing">%1$s에서 재생 중</string>
+    <string name="next_addon_phone_only">이 휴대전화에서 재생 중이며 곡 전환이 진행되고 있지 않을 때 다른 소스를 시도하세요.</string>
+    <string name="next_addon_unknown_cache">이전에 캐시된 이 노래에는 애드온 정보가 없습니다. 오디오 캐시를 지우고 노래를 다시 재생한 후 시도하세요.</string>
+    <string name="automix_overview">Automix 개요</string>
+    <string name="diwali_title">BitChord가 행복한 디왈리를 기원합니다</string>
+    <string name="diwali_subtitle">빛의 축제가 여러분의 집을 기쁨으로, 매일을 음악으로 가득 채우길 바랍니다.</string>
+    <string name="diwali_cta">함께 축하해요</string>
 </resources>

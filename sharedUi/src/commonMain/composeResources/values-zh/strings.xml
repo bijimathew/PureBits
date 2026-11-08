@@ -198,4 +198,8 @@
     <string name="search_library_empty">搜索本地音乐文件夹中的歌曲。</string>
     <string name="search_library_hint">歌曲、艺人和专辑</string>
     <string name="search_library_no_results">本地音乐中没有与「%1$s」匹配的内容。</string>
+    <string name="next_addon">搜索下一个音源</string>
+    <string name="next_addon_description">在下一个插件音源中搜索这首歌曲</string>
+    <string name="next_addon_searching">正在搜索下一个音源…</string>
+    <string name="automix_overview_unavailable">暂无即将进行的 Automix 转场</string>
 </resources>

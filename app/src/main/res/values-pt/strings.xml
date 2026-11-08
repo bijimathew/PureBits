@@ -1462,4 +1462,13 @@
     <string name="bit_perfect_status_inexact">%1$s · não exato: esta fonte não é PCM sem perdas</string>
     <string name="bit_perfect_status_waiting">Aguardando uma faixa sem perdas em uma saída compatível</string>
     <string name="bit_perfect_status_unavailable">Indisponível para esta faixa (%1$s)</string>
+    <string name="next_addon_no_match">Não foi encontrada nenhuma música correspondente nos complementos restantes compatíveis. A fonte atual permanece inalterada.</string>
+    <string name="next_addon_failed">Não foi possível trocar de complemento. Tente novamente.</string>
+    <string name="next_addon_playing">Reproduzindo de %1$s</string>
+    <string name="next_addon_phone_only">Experimente outra fonte quando a reprodução estiver neste telefone e não houver uma transição em andamento.</string>
+    <string name="next_addon_unknown_cache">Esta música armazenada anteriormente em cache não tem dados do complemento. Limpe o cache de áudio, reproduza-a novamente e tente outra vez.</string>
+    <string name="automix_overview">Visão geral do Automix</string>
+    <string name="diwali_title">O BitChord deseja a você um feliz Diwali</string>
+    <string name="diwali_subtitle">Que este festival de luzes encha sua casa de alegria e seus dias de música.</string>
+    <string name="diwali_cta">Vamos celebrar</string>
 </resources>

@@ -198,4 +198,8 @@
     <string name="search_library_empty">Pesquise as músicas da sua pasta de Música local.</string>
     <string name="search_library_hint">Músicas, artistas e álbuns</string>
     <string name="search_library_no_results">Nada na Música local corresponde a “%1$s”.</string>
+    <string name="next_addon">Buscar na próxima fonte</string>
+    <string name="next_addon_description">Buscar esta música na próxima fonte de complemento</string>
+    <string name="next_addon_searching">Buscando na próxima fonte…</string>
+    <string name="automix_overview_unavailable">Nenhuma transição do Automix está chegando</string>
 </resources>

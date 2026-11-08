@@ -20,7 +20,8 @@ internal object PlaybackFallback {
         if (parameter(uri, DIRECT_YOUTUBE_PARAMETER) == "1") return false
         if (uri.substringBefore('?').substringBefore('#') == "bitchord://source") return true
         val rendition = parameter(uri, QualityUpgrade.MARKER)
-        return substitutedYouTube || rendition == "hifi" || rendition?.startsWith("hifi-") == true
+        return substitutedYouTube || rendition == "hifi" || rendition?.startsWith("hifi-") == true ||
+            rendition?.startsWith(AddonSwitch.PREFIX) == true
     }
 
     /**

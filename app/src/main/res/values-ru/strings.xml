@@ -1489,4 +1489,13 @@
     <string name="bit_perfect_status_inexact">%1$s · неточно: этот источник не является PCM без потерь</string>
     <string name="bit_perfect_status_waiting">Ожидание трека без потерь на поддерживаемом выходе</string>
     <string name="bit_perfect_status_unavailable">Недоступно для этого трека (%1$s)</string>
+    <string name="next_addon_no_match">В оставшихся подходящих дополнениях не найдено совпадающих треков. Текущий источник не изменён.</string>
+    <string name="next_addon_failed">Не удалось сменить дополнение. Попробуйте снова.</string>
+    <string name="next_addon_playing">Воспроизведение из %1$s</string>
+    <string name="next_addon_phone_only">Попробуйте другой источник, когда воспроизведение идёт на этом телефоне и переход между треками не выполняется.</string>
+    <string name="next_addon_unknown_cache">У этого ранее кэшированного трека нет сведений о дополнении. Очистите аудиокэш, включите трек заново и повторите попытку.</string>
+    <string name="automix_overview">Обзор Automix</string>
+    <string name="diwali_title">BitChord желает вам счастливого Дивали</string>
+    <string name="diwali_subtitle">Пусть этот праздник огней наполнит ваш дом радостью, а каждый день — музыкой.</string>
+    <string name="diwali_cta">Давайте праздновать</string>
 </resources>

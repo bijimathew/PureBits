@@ -1497,4 +1497,13 @@
     <string name="bit_perfect_status_inexact">%1$s · niedokładne: to źródło nie jest bezstratnym PCM</string>
     <string name="bit_perfect_status_waiting">Oczekiwanie na bezstratny utwór na obsługiwanym wyjściu</string>
     <string name="bit_perfect_status_unavailable">Niedostępne dla tego utworu (%1$s)</string>
+    <string name="next_addon_no_match">Nie znaleziono pasującego utworu w pozostałych dostępnych dodatkach. Bieżące źródło pozostaje bez zmian.</string>
+    <string name="next_addon_failed">Nie udało się zmienić dodatku. Spróbuj ponownie.</string>
+    <string name="next_addon_playing">Odtwarzanie ze źródła %1$s</string>
+    <string name="next_addon_phone_only">Wypróbuj inne źródło, gdy odtwarzanie odbywa się na tym telefonie i nie trwa przejście między utworami.</string>
+    <string name="next_addon_unknown_cache">Ten wcześniej zapisany w pamięci podręcznej utwór nie ma danych dodatku. Wyczyść pamięć podręczną dźwięku, odtwórz go ponownie i spróbuj jeszcze raz.</string>
+    <string name="automix_overview">Przegląd Automix</string>
+    <string name="diwali_title">BitChord życzy Ci radosnego Diwali</string>
+    <string name="diwali_subtitle">Niech to święto świateł wypełni Twój dom radością, a każdy dzień muzyką.</string>
+    <string name="diwali_cta">Świętujmy</string>
 </resources>

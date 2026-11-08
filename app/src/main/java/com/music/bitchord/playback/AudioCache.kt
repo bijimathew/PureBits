@@ -560,6 +560,14 @@ object AudioCache {
             ?.let { name -> Origin.values().firstOrNull { it.name == name } }
     }
 
+    /** The actual source that filled this rendition, retained across process restarts. */
+    fun sourceConfigIdOf(uri: Uri): String? {
+        if (!::cache.isInitialized || uri.scheme != "bitchord") return null
+        val key = keyFactory.buildCacheKey(DataSpec(uri))
+        return runCatching { cache.getContentMetadata(key).get(META_SOURCE_CONFIG_ID, null as String?) }
+            .getOrNull()
+    }
+
     /**
      * Whether [key] already holds bytes of YouTube's own stream.
      *
@@ -763,6 +771,7 @@ object AudioCache {
         val mediaId = mediaIdIn(spec.uri) ?: return
         val key = spec.key ?: keyFactory.buildCacheKey(spec)
         val origin = originOf(spec.uri, mediaId, servedUrl)
+        val sourceConfigId = servingSourceConfigId(spec.uri, mediaId, servedUrl)
         val song = notedSongs[mediaId]
         // Automix's analysis-only read: its own YouTube Opus download, made
         // whatever the track is actually playing from. Never playback.
@@ -776,6 +785,7 @@ object AudioCache {
             val played = has(META_PLAYED) || (!analysis && mediaId in playedIds)
             val tagged = meta.get(META_ORIGIN, null as String?) == origin.name &&
                 meta.get(META_MEDIA_ID, null as String?) == mediaId &&
+                meta.get(META_SOURCE_CONFIG_ID, null as String?) == sourceConfigId &&
                 has(META_PLAYBACK) == usedByPlayback &&
                 (usedByPlayback || has(META_ANALYSIS)) &&
                 has(META_PLAYED) == played
@@ -787,6 +797,8 @@ object AudioCache {
                 ContentMetadataMutations().also { mutations ->
                     mutations.set(META_ORIGIN, origin.name)
                     mutations.set(META_MEDIA_ID, mediaId)
+                    if (sourceConfigId != null) mutations.set(META_SOURCE_CONFIG_ID, sourceConfigId)
+                    else mutations.remove(META_SOURCE_CONFIG_ID)
                     if (usedByPlayback) mutations.set(META_PLAYBACK, "1") else mutations.set(META_ANALYSIS, "1")
                     if (played) mutations.set(META_PLAYED, "1")
                     describe(mutations, song, spec.uri)
@@ -803,22 +815,37 @@ object AudioCache {
      * The host settles it for the two kinds that are kept: YouTube only ever
      * hands out googlevideo URLs and JioSaavn its own CDN. The source that was
      * chosen is the fallback, for a JioSaavn URL on a host this doesn't know
-     * — read in the same order the resolver answers in: an upgrade's stream,
-     * then a source-backed track's own source, then the choice already
+     * — read in the same order the resolver answers in: a manual choice or
+     * upgrade's stream, then a source-backed track's resolved source, then the choice already
      * serving the track. Anything not positively one of the two is [Origin.OTHER].
      */
     private fun originOf(uri: Uri, mediaId: String, servedUrl: String): Origin {
         val host = runCatching { Uri.parse(servedUrl).host }.getOrNull()?.lowercase(Locale.ROOT).orEmpty()
         if (host.endsWith("googlevideo.com") || host.endsWith("youtube.com")) return Origin.YOUTUBE
         if (host.endsWith("saavncdn.com") || host.endsWith("jiosaavn.com")) return Origin.JIOSAAVN
-        val upgrade = QualityUpgrade.forcedStream(uri)
-        val configId = when {
-            upgrade != null -> upgrade.sourceConfigId
-            uri.getQueryParameter("s") != null -> uri.getQueryParameter("s")
-            else -> StreamChoice.of(mediaId)?.sourceConfigId
-        }
+        val configId = servingSourceConfigId(uri, mediaId, servedUrl)
         val kind = configId?.let { SourceRegistry.config(it)?.kind }
         return if (kind == SourceKind.JIOSAAVN) Origin.JIOSAAVN else Origin.OTHER
+    }
+
+    private fun servingSourceConfigId(uri: Uri, mediaId: String, servedUrl: String): String? {
+        // These requests bypass the playback choice; do not attribute their
+        // YouTube bytes to an addon still remembered for the same song.
+        if (uri.getQueryParameter(DIRECT_YOUTUBE_PARAMETER) == "1" ||
+            AutomixAnalysisSource.requestsYouTubeOpus(
+                uri.getQueryParameter(AutomixAnalysisSource.OPUS_QUERY_PARAMETER),
+            )
+        ) return null
+        val manualChoice = QualityUpgrade.cacheTag(uri)
+            ?.takeIf { it.startsWith(AddonSwitch.PREFIX) }
+            ?.let { AddonSwitch.stream(mediaId, it) }
+        val upgrade = QualityUpgrade.forcedStream(uri)
+        return sourceConfigIdForServedStream(
+            servedUrl = servedUrl,
+            explicitStream = manualChoice ?: upgrade,
+            rememberedStream = StreamChoice.of(mediaId),
+            resolvedSourceRowId = if (uri.authority == "source") AddonSwitch.sourceFor(mediaId) else null,
+        )
     }
 
     /** Writes what the folder shows about a track into [mutations]. */
@@ -1117,16 +1144,17 @@ object AudioCache {
      *
      *  - **Complete.** A whole entry is never written to again, so it can't
      *    become the mixed-file seam a partial one is.
-     *  - **Not an upgrade's rendition.** A `#hifi` entry is reached only
-     *    through the marked item that swapped it in, which no restored or
-     *    newly queued item carries — kept, it would sit on disk unread.
+     *  - **Not a session's marked rendition.** A `#hifi` or manual `#addon-`
+     *    entry depends on the in-memory stream behind its marked item. Once
+     *    that choice is gone, keeping its bytes leaves an unreadable entry.
      *  - **Audio, by its first bytes.** Tidal answers with a DASH manifest, and
      *    the XML lands under the track's own key; kept, the next play would
      *    read a manifest of expired segment URLs off disk as if it were the
      *    song. WebM, MP4 and FLAC pass, as [cachedContainerOf] reads them.
      */
     private fun keepsAddonCopy(key: String): Boolean =
-        !key.contains("#hifi") && isComplete(key) && containerOf(key) != null
+        !key.contains("#hifi") && !key.contains("#${AddonSwitch.PREFIX}") &&
+            isComplete(key) && containerOf(key) != null
 
     /** The part of a cache key that names the track, before any `#rendition`; see [keyFactory]. */
     private fun cacheKeyBaseOf(mediaId: String): String =
@@ -1146,6 +1174,7 @@ object AudioCache {
 
     private const val META_ORIGIN = "bc_origin"
     private const val META_MEDIA_ID = "bc_media_id"
+    private const val META_SOURCE_CONFIG_ID = "bc_source_config_id"
     private const val META_TITLE = "bc_title"
     private const val META_ARTIST = "bc_artist"
     private const val META_ALBUM = "bc_album"
@@ -2420,6 +2449,20 @@ object AudioCache {
             )
         }
     }
+}
+
+/** Attributes the bytes actually returned, ignoring a stale choice for a different URL. */
+internal fun sourceConfigIdForServedStream(
+    servedUrl: String,
+    explicitStream: SourceStream?,
+    rememberedStream: SourceStream?,
+    resolvedSourceRowId: String?,
+): String? {
+    if (explicitStream?.url == servedUrl) return explicitStream.sourceConfigId
+    // Source-backed rows may fall back to another source, so their queued `s`
+    // parameter is not evidence. The resolver records the actual source ID.
+    if (resolvedSourceRowId != null) return resolvedSourceRowId
+    return rememberedStream?.takeIf { it.url == servedUrl }?.sourceConfigId
 }
 
 /** How many leading bytes [cachedContainerOf] needs to tell the containers apart. */

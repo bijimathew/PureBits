@@ -1434,4 +1434,13 @@
     <string name="bit_perfect_status_inexact">%1$s · 不精确：此音源不是无损 PCM</string>
     <string name="bit_perfect_status_waiting">正在等待受支持输出上的无损曲目</string>
     <string name="bit_perfect_status_unavailable">此曲目不可用（%1$s）</string>
+    <string name="next_addon_no_match">在其余可用的插件中未找到匹配歌曲。当前来源保持不变。</string>
+    <string name="next_addon_failed">无法切换插件，请重试。</string>
+    <string name="next_addon_playing">正在从 %1$s 播放</string>
+    <string name="next_addon_phone_only">请在此手机上播放且未进行歌曲过渡时尝试其他来源。</string>
+    <string name="next_addon_unknown_cache">这首以前缓存的歌曲没有插件信息。请清除音频缓存，重新播放后再试。</string>
+    <string name="automix_overview">Automix 概览</string>
+    <string name="diwali_title">BitChord 祝你排灯节快乐</string>
+    <string name="diwali_subtitle">愿这个灯火节日为你的家带来喜悦，为每天带来音乐。</string>
+    <string name="diwali_cta">一起庆祝</string>
 </resources>

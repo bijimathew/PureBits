@@ -1414,4 +1414,13 @@
     <string name="bit_perfect_status_inexact">%1$s · tam değil: bu kaynak kayıpsız PCM değil</string>
     <string name="bit_perfect_status_waiting">Desteklenen bir çıkışta kayıpsız parça bekleniyor</string>
     <string name="bit_perfect_status_unavailable">Bu parça için kullanılamıyor (%1$s)</string>
+    <string name="next_addon_no_match">Kalan uygun eklentilerde eşleşen şarkı bulunamadı. Geçerli kaynak değiştirilmedi.</string>
+    <string name="next_addon_failed">Eklenti değiştirilemedi. Tekrar deneyin.</string>
+    <string name="next_addon_playing">%1$s üzerinden çalınıyor</string>
+    <string name="next_addon_phone_only">Oynatma bu telefondayken ve bir geçiş sürmüyorken başka bir kaynak deneyin.</string>
+    <string name="next_addon_unknown_cache">Daha önce önbelleğe alınan bu şarkıda eklenti ayrıntıları yok. Ses önbelleğini temizleyin, şarkıyı yeniden çalın ve tekrar deneyin.</string>
+    <string name="automix_overview">Automix özeti</string>
+    <string name="diwali_title">BitChord mutlu bir Diwali diler</string>
+    <string name="diwali_subtitle">Bu ışık festivali evinizi neşeyle, günlerinizi müzikle doldursun.</string>
+    <string name="diwali_cta">Birlikte kutlayalım</string>
 </resources>

@@ -198,4 +198,8 @@
     <string name="search_library_empty">ローカル音楽フォルダ内の曲を検索します。</string>
     <string name="search_library_hint">曲・アーティスト・アルバム</string>
     <string name="search_library_no_results">ローカル音楽に「%1$s」に一致するものはありません。</string>
+    <string name="next_addon">次のソースで検索</string>
+    <string name="next_addon_description">この曲を次のアドオンソースで検索</string>
+    <string name="next_addon_searching">次のソースで検索中…</string>
+    <string name="automix_overview_unavailable">次のAutomixトランジションはありません</string>
 </resources>

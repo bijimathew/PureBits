@@ -168,6 +168,14 @@ fun MediaController.upgradeQuality() {
     )
 }
 
+/** Searches the same track on another addon through the service-owned resolver. */
+fun MediaController.nextAddon() {
+    sendCustomCommand(
+        SessionCommand(ACTION_NEXT_ADDON, Bundle.EMPTY),
+        Bundle.EMPTY,
+    )
+}
+
 /**
  * Asks the service to revert the playing track to YouTube's original stream.
  */

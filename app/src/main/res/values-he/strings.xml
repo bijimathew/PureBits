@@ -1462,4 +1462,13 @@
     <string name="bit_perfect_status_inexact">%1$s · לא מדויק: המקור הזה אינו PCM ללא אובדן</string>
     <string name="bit_perfect_status_waiting">ממתין לרצועת Lossless ביציאה נתמכת</string>
     <string name="bit_perfect_status_unavailable">לא זמין עבור רצועה זו (%1$s)</string>
+    <string name="next_addon_no_match">לא נמצא שיר תואם בתוספים המתאימים שנותרו. המקור הנוכחי לא השתנה.</string>
+    <string name="next_addon_failed">לא ניתן לעבור לתוסף אחר. אפשר לנסות שוב.</string>
+    <string name="next_addon_playing">מתנגן מתוך %1$s</string>
+    <string name="next_addon_phone_only">אפשר לנסות מקור אחר כשההשמעה מתבצעת בטלפון הזה ולא מתבצע מעבר בין שירים.</string>
+    <string name="next_addon_unknown_cache">לשיר הזה, שנשמר בעבר במטמון, אין פרטים על התוסף. יש לנקות את מטמון האודיו, להפעיל את השיר מחדש ולנסות שוב.</string>
+    <string name="automix_overview">סקירת Automix</string>
+    <string name="diwali_title">BitChord מאחל לך דיוואלי שמח</string>
+    <string name="diwali_subtitle">מי ייתן וחג האורות הזה ימלא את ביתך בשמחה ואת ימיך במוזיקה.</string>
+    <string name="diwali_cta">בואו נחגוג</string>
 </resources>

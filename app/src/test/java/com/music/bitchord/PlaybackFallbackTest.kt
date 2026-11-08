@@ -9,6 +9,22 @@ import org.junit.Test
 class PlaybackFallbackTest {
 
     @Test
+    fun `failed manual addon choice can fall back without reopening the rejected source`() {
+        assertTrue(
+            PlaybackFallback.isAlternative(
+                "bitchord://watch?v=5IX-nUxDtJI&q=addon-choice-123",
+                substitutedYouTube = false,
+            ),
+        )
+        assertFalse(
+            PlaybackFallback.isAlternative(
+                "bitchord://watch?v=5IX-nUxDtJI&direct_youtube=1&q=addon-choice-123",
+                substitutedYouTube = false,
+            ),
+        )
+    }
+
+    @Test
     fun `failed upgraded YouTube item is an alternative`() {
         assertTrue(
             PlaybackFallback.isAlternative(

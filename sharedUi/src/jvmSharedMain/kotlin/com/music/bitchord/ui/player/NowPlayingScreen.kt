@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -68,9 +69,13 @@ import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Hub
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
@@ -136,8 +141,11 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -867,6 +875,9 @@ fun NowPlayingScreen(
      * rather than a still of it.
      */
     onLiveCanvasChanged: (Boolean) -> Unit = {},
+    /** Search this track on another addon without advancing the queue. */
+    onNextAddon: (() -> Unit)? = null,
+    addonSwitching: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -2189,18 +2200,38 @@ fun NowPlayingScreen(
                                     onOpenArtist = onOpenArtist,
                                 )
                             },
-                            lyricStrip = if (syncedLyricsEnabled) {
+                            lyricStrip = if (syncedLyricsEnabled || (onNextAddon != null && !controlsLocked)) {
                                 {
-                                    CurrentLyricStrip(
-                                        lines = lyricsTranslation.displayedLyrics,
-                                        trackKey = song.videoId,
-                                        playhead = lyricsPlayhead,
-                                        isPlaying = isPlaying && position.advancing,
-                                        durationMs = durationMs,
-                                        lyricsUnavailable = lyricsUnavailable,
-                                        loadingText = lyricsLoadingText,
-                                        onClick = openLyrics,
-                                    )
+                                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                        val sourceButtonMaxWidth = maxWidth * 0.75f
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (syncedLyricsEnabled) {
+                                                Box(Modifier.weight(1f)) {
+                                                    CurrentLyricStrip(
+                                                        lines = lyricsTranslation.displayedLyrics,
+                                                        trackKey = song.videoId,
+                                                        playhead = lyricsPlayhead,
+                                                        isPlaying = isPlaying && position.advancing,
+                                                        durationMs = durationMs,
+                                                        lyricsUnavailable = lyricsUnavailable,
+                                                        loadingText = lyricsLoadingText,
+                                                        onClick = openLyrics,
+                                                    )
+                                                }
+                                            } else {
+                                                Spacer(Modifier.weight(1f))
+                                            }
+                                            if (onNextAddon != null && !controlsLocked) {
+                                                NextAddonButton(
+                                                    searching = addonSwitching,
+                                                    onClick = onNextAddon,
+                                                    // Keep room for the lyric in a narrow landscape pane,
+                                                    // including when the source label is translated.
+                                                    modifier = Modifier.widthIn(max = sourceButtonMaxWidth),
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             } else {
                                 null
@@ -4036,6 +4067,17 @@ fun NowPlayingScreen(
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
+                    if (onNextAddon != null && !controlsLocked) {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                            // Keep the deck's height stable while the artwork collapses
+                            // into the lyric or queue header.
+                            if (!lyricsOpen && !queueOpen) {
+                                NextAddonButton(searching = addonSwitching, onClick = onNextAddon)
+                            } else {
+                                Spacer(Modifier.height(48.dp))
+                            }
+                        }
+                    }
                     // Current lyric, one line, directly above the scrubber. It stays in
                     // the layout — and stays fully visible — whether or not the queue
                     // is open: dropping it would shorten this block and the controls
@@ -4175,6 +4217,54 @@ fun NowPlayingScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NextAddonButton(searching: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val haptics = rememberHaptics()
+    val label = stringResource(if (searching) Res.string.next_addon_searching else Res.string.next_addon)
+    val description = stringResource(Res.string.next_addon_description)
+    val chrome = LocalPlayerChrome.current
+    val foreground = chromeWhite(0.78f)
+    val disabledForeground = chromeWhite(0.42f)
+    TextButton(
+        onClick = {
+            haptics.play(Haptic.Tap)
+            onClick()
+        },
+        enabled = !searching,
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = foreground,
+            disabledContentColor = disabledForeground,
+        ),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .additiveChrome(chrome)
+            .semantics {
+                contentDescription = description
+                stateDescription = if (searching) label else ""
+            },
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            // Measure the source icon first so long labels cannot push it out.
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(Modifier.width(6.dp))
+        if (searching) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = disabledForeground,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(Icons.Rounded.Hub, contentDescription = null, modifier = Modifier.size(18.dp))
         }
     }
 }

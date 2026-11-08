@@ -1434,4 +1434,13 @@
     <string name="bit_perfect_status_inexact">%1$s · tidak persis: sumber ini bukan PCM lossless</string>
     <string name="bit_perfect_status_waiting">Menunggu trek lossless pada output yang didukung</string>
     <string name="bit_perfect_status_unavailable">Tidak tersedia untuk trek ini (%1$s)</string>
+    <string name="next_addon_no_match">Tidak ditemukan lagu yang cocok di addon tersisa yang dapat digunakan. Sumber saat ini tidak berubah.</string>
+    <string name="next_addon_failed">Tidak dapat beralih addon. Coba lagi.</string>
+    <string name="next_addon_playing">Memutar dari %1$s</string>
+    <string name="next_addon_phone_only">Coba sumber lain saat pemutaran berlangsung di ponsel ini dan tidak ada transisi yang sedang berjalan.</string>
+    <string name="next_addon_unknown_cache">Lagu yang disimpan di cache sebelumnya ini tidak memiliki detail addon. Hapus cache audio, putar ulang lagu, lalu coba lagi.</string>
+    <string name="automix_overview">Ringkasan Automix</string>
+    <string name="diwali_title">BitChord mengucapkan selamat Diwali</string>
+    <string name="diwali_subtitle">Semoga festival cahaya ini memenuhi rumahmu dengan kebahagiaan dan hari-harimu dengan musik.</string>
+    <string name="diwali_cta">Mari rayakan</string>
 </resources>

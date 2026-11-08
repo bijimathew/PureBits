@@ -1457,4 +1457,13 @@
     <string name="bit_perfect_status_inexact">%1$s · nicht exakt: Diese Quelle ist kein verlustfreies PCM</string>
     <string name="bit_perfect_status_waiting">Warte auf einen verlustfreien Titel an einem unterstützten Ausgang</string>
     <string name="bit_perfect_status_unavailable">Für diesen Titel nicht verfügbar (%1$s)</string>
+    <string name="next_addon_no_match">In den verbleibenden geeigneten Erweiterungen wurde kein passender Titel gefunden. Die aktuelle Quelle bleibt unverändert.</string>
+    <string name="next_addon_failed">Die Erweiterung konnte nicht gewechselt werden. Versuche es erneut.</string>
+    <string name="next_addon_playing">Wiedergabe über %1$s</string>
+    <string name="next_addon_phone_only">Versuche eine andere Quelle, wenn die Wiedergabe auf diesem Telefon läuft und kein Übergang stattfindet.</string>
+    <string name="next_addon_unknown_cache">Für diesen früher zwischengespeicherten Titel fehlen Angaben zur Erweiterung. Leere den Audio-Cache, spiele ihn erneut ab und versuche es noch einmal.</string>
+    <string name="automix_overview">Automix-Übersicht</string>
+    <string name="diwali_title">BitChord wünscht dir ein frohes Diwali</string>
+    <string name="diwali_subtitle">Möge dieses Lichterfest dein Zuhause mit Freude und deine Tage mit Musik erfüllen.</string>
+    <string name="diwali_cta">Lasst uns feiern</string>
 </resources>

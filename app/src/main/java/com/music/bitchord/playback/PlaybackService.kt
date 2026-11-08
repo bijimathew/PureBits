@@ -151,7 +151,6 @@ import com.music.bitchord.playback.smart.AutomixAnalysisSource
 import com.music.bitchord.playback.smart.VersionAudioAligner
 import com.music.bitchord.widget.MediaWidget
 import com.music.bitchord.widget.MediaWidgetSnapshot
-import com.music.bitchord.wear.WearBridge
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -211,8 +210,6 @@ const val ACTION_SWAP_VERSION = "com.music.bitchord.action.SWAP_VERSION"
 const val EXTRA_SWAP_MEDIA_ITEM = "bitchord.swap.media_item"
 
 /** Session command used by the media notification's and the 4×1 widget's Favorite button. */
-/** How long the service may stay in the foreground, paused, while the watch plays. */
-private const val WATCH_SESSION_FOREGROUND_MS = 6 * 60 * 60 * 1000L
 
 const val ACTION_TOGGLE_FAVORITE = "com.music.bitchord.action.TOGGLE_FAVORITE"
 
@@ -230,6 +227,7 @@ const val ACTION_COMMIT_RADIO_QUEUE = "com.music.bitchord.action.COMMIT_RADIO_QU
 
 /** Session command behind the player menu's "Upgrade quality". */
 const val ACTION_UPGRADE_QUALITY = "com.music.bitchord.action.UPGRADE_QUALITY"
+const val ACTION_NEXT_ADDON = "com.music.bitchord.action.NEXT_ADDON"
 
 /**
  * App-side gate for explicit quality retries.
@@ -757,17 +755,8 @@ class PlaybackService : MediaLibraryService() {
         say = { message -> Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show() },
     )
 
-    /**
-     * The BitChord watch app as the speaker — the same model as Cast: the phone
-     * keeps the queue paused, the watch plays it and owns the clock. See
-     * [WearBridge.createSpeaker].
-     */
-    private val watchSpeaker by lazy {
-        WearBridge.createSpeaker(this, scope, localPlayer = { player }, onChanged = { publishWidgetState() })
-    }
-
     /** Every remote speaker, as the one the session player reports. */
-    private val speakers by lazy { Speakers(listOf(castPlayback, watchSpeaker)) }
+    private val speakers by lazy { Speakers(listOf(castPlayback)) }
 
     /**
      * Binds playback to a Listen Together party, when there is one.
@@ -789,6 +778,7 @@ class PlaybackService : MediaLibraryService() {
     private val beginRadioQueueCommand = SessionCommand(ACTION_BEGIN_RADIO_QUEUE, Bundle.EMPTY)
     private val commitRadioQueueCommand = SessionCommand(ACTION_COMMIT_RADIO_QUEUE, Bundle.EMPTY)
     private val upgradeQualityCommand = SessionCommand(ACTION_UPGRADE_QUALITY, Bundle.EMPTY)
+    private val nextAddonCommand = SessionCommand(ACTION_NEXT_ADDON, Bundle.EMPTY)
     private val swapVersionCommand = SessionCommand(ACTION_SWAP_VERSION, Bundle.EMPTY)
     private val queueDragCommand = SessionCommand(ACTION_QUEUE_DRAG, Bundle.EMPTY)
 
@@ -797,6 +787,8 @@ class PlaybackService : MediaLibraryService() {
     private var autoplayLoadJob: Job? = null
     /** Rate limit for listener-requested retries; automatic upgrades do not touch it. */
     private val manualUpgradeThrottle = ManualUpgradeThrottle(MANUAL_UPGRADE_COOLDOWN_MS)
+    private var addonSwitchJob: Job? = null
+    private var rejectedAddonSources = ConcurrentHashMap.newKeySet<String>()
     /** The upcoming ids read-ahead was last asked to warm, so an unchanged queue isn't asked again. */
     private var preferredPrefetchRequest: List<String>? = null
     private var autoplaySeed: String? = null
@@ -977,9 +969,6 @@ class PlaybackService : MediaLibraryService() {
                 lastSeekAt = SystemClock.elapsedRealtime()
                 if (exoPlayer.isPlaying) pushDiscordPresence(exoPlayer)
                 updateLyricSubtitle()
-                // The watch extrapolates its progress ring from the last
-                // position it was given, the same way Discord does.
-                WearBridge.republish(this@PlaybackService, exoPlayer)
             }
         }
 
@@ -1095,7 +1084,6 @@ class PlaybackService : MediaLibraryService() {
             val previous = lastRepeatMode
             lastRepeatMode = repeatMode
             speakers.onLocalRepeatChanged(repeatMode)
-            player?.let { WearBridge.republish(this@PlaybackService, it) }
             // Repeat-one makes the "next" track this one again.
             player?.let { activeLoudness().nextMediaId = nextMediaIdOf(it) }
             // Repeat-all loops the queue as it stands; AutoPlay's tracks are the
@@ -1324,17 +1312,6 @@ class PlaybackService : MediaLibraryService() {
                     publishWidgetState()
                 }
         }
-        // While the watch is the speaker this process serves its audio, and a
-        // paused service drops out of the foreground after ten minutes — after
-        // which Android may freeze the process mid-stream. Held up for the
-        // length of the session instead.
-        scope.launch {
-            WearBridge.watchSession.collect { onWatch ->
-                setForegroundServiceTimeoutMs(
-                    if (onWatch) WATCH_SESSION_FOREGROUND_MS else DEFAULT_FOREGROUND_SERVICE_TIMEOUT_MS,
-                )
-            }
-        }
         // Signing in or out adds or removes Like everywhere at once.
         scope.launch {
             SignedIn.state(this@PlaybackService)
@@ -1403,6 +1380,32 @@ class PlaybackService : MediaLibraryService() {
             // usually *not* the one playing, which is exactly why the lines
             // have to say. See [TrackLog.about].
             val about = TrackLog.about(mediaIdIn(dataSpec.uri))
+            // Manual choices precede both source-row and YouTube resolution. Falling
+            // through here could reopen the very addon the listener just rejected.
+            val rendition = dataSpec.uri.getQueryParameter(QualityUpgrade.MARKER)
+            if (rendition?.startsWith(AddonSwitch.PREFIX) == true &&
+                !AutomixAnalysisSource.requestsYouTubeOpus(
+                    dataSpec.uri.getQueryParameter(AutomixAnalysisSource.OPUS_QUERY_PARAMETER),
+                )
+            ) {
+                val mediaId = mediaIdIn(dataSpec.uri)
+                    ?: throw java.io.IOException("Missing track identity for addon choice")
+                val stream = AddonSwitch.stream(mediaId, rendition)
+                    ?: throw java.io.IOException("Addon choice expired; try the next source again")
+                if (SourceRegistry.activeForPlayback().none { it.configId == stream.sourceConfigId }) {
+                    throw java.io.IOException("Selected addon is no longer eligible for playback")
+                }
+                val sourceName = stream.sourceConfigId?.let { SourceRegistry.config(it)?.displayName } ?: "Addon"
+                if (!QualityUpgrade.isAuditioning(mediaId)) {
+                    AddonSwitch.recordSource(mediaId, stream.sourceConfigId)
+                    NerdStats.onSourceStream(mediaId, stream.format, sourceName)
+                    NerdStats.recordSource(mediaId, sourceName)
+                }
+                return@Resolver dataSpec.buildUpon()
+                    .setUri(Uri.parse(stream.url))
+                    .setHttpRequestHeaders(stream.headers)
+                    .build()
+            }
             // A source-backed track is resolved by whichever source can serve
             // it, which is not necessarily the one it was queued from — see
             // [SourceResolver.resolve]. Handled ahead of the YouTube path
@@ -1439,6 +1442,7 @@ class PlaybackService : MediaLibraryService() {
                 }
                 val trackParam = dataSpec.uri.getQueryParameter("t")
                 val fullMediaId = mediaIdIn(dataSpec.uri)
+                fullMediaId?.let { AddonSwitch.recordSource(it, stream.sourceConfigId) }
                 NerdStats.onSourceStream(fullMediaId ?: trackParam, stream.format, sourceName)
                 if (fullMediaId != null) {
                     NerdStats.recordSource(fullMediaId, sourceName)
@@ -1468,6 +1472,7 @@ class PlaybackService : MediaLibraryService() {
             // Answer it before StreamChoice, the module race and a pending
             // upgrade can put another source back under the listener.
             if (dataSpec.uri.getQueryParameter(DIRECT_YOUTUBE_PARAMETER) == "1") {
+                AddonSwitch.recordSource(videoId, null)
                 QualityUpgrade.forget(videoId)
                 StreamChoice.forget(videoId)
                 NerdStats.clearDeclared(videoId)
@@ -1509,6 +1514,9 @@ class PlaybackService : MediaLibraryService() {
             // else, and without re-resolving: this exact URL is what the
             // player was told it was getting when it agreed to the swap.
             QualityUpgrade.forcedStream(dataSpec.uri)?.let { upgraded ->
+                if (!QualityUpgrade.isAuditioning(videoId)) {
+                    AddonSwitch.recordSource(videoId, upgraded.sourceConfigId)
+                }
                 // An audition opens this same stream before a note of the one
                 // playing has been touched — see [auditionUpgrade] — so what it
                 // is about to be handed describes a swap that has not happened
@@ -1554,6 +1562,7 @@ class PlaybackService : MediaLibraryService() {
             // the middle of an MP4 ended up appended to a WebM. See
             // [StreamChoice].
             StreamChoice.of(videoId)?.let { serving ->
+                AddonSwitch.recordSource(videoId, serving.sourceConfigId)
                 // What the stream claims to be, restated on every open rather
                 // than only on the one that chose it.
                 //
@@ -1680,6 +1689,7 @@ class PlaybackService : MediaLibraryService() {
             }
             when (won) {
                 is Resolved.Module -> {
+                    AddonSwitch.recordSource(videoId, won.stream.sourceConfigId)
                     val sourceName = won.stream.sourceConfigId?.let { SourceRegistry.config(it)?.displayName }
                         ?: "Module"
                     NerdStats.onSourceStream(videoId, won.stream.format, sourceName)
@@ -1699,6 +1709,7 @@ class PlaybackService : MediaLibraryService() {
                 // no such deadline, so what was nearly in hand is asked for
                 // again while the fallback plays.
                 is Resolved.YouTube -> {
+                    AddonSwitch.recordSource(videoId, null)
                     NerdStats.recordSource(videoId, "YouTube")
                     val headers = StreamResolver.mediaHeadersFor(won.url)
                     StreamChoice.remember(videoId, SourceStream(won.url, headers = headers), substituted = false)
@@ -1731,7 +1742,9 @@ class PlaybackService : MediaLibraryService() {
             // track's bytes it is fetching; this is the seam where both are in
             // hand. See [StreamContainer].
             streamResolver.resolveDataSpec(dataSpec).also { resolved ->
-                mediaIdIn(dataSpec.uri)?.let { StreamContainer.served(it, resolved.uri.toString()) }
+                mediaIdIn(dataSpec.uri)?.let { id ->
+                    if (!QualityUpgrade.isAuditioning(id)) StreamContainer.served(id, resolved.uri.toString())
+                }
                 // The same seam tells the cache whose file it is writing, which
                 // decides whether the entry outlives the track — see
                 // [AudioCache.Origin].
@@ -1753,8 +1766,6 @@ class PlaybackService : MediaLibraryService() {
             DsdExtractorsFactory(),
         )
             .setLoadErrorHandlingPolicy(PermanentAwareLoadErrorPolicy())
-        // The watch, when it is the speaker, reads tracks through this same chain.
-        WearBridge.attachStreams(AudioCache.playbackFactory(defaultDataSourceFactory))
 
         configuredFloatOutput = shouldEnableFloatOutput()
         val exoPlayer = buildPlayer(
@@ -3637,6 +3648,10 @@ class PlaybackService : MediaLibraryService() {
         alreadyAudible: Boolean = false,
     ) {
         val exoPlayer = player ?: return
+        addonSwitchJob?.cancel()
+        addonSwitchJob = null
+        AddonSwitch.searchingMediaId.value = null
+        rejectedAddonSources = ConcurrentHashMap.newKeySet<String>()
         syncBoundedContextCursor(exoPlayer, mediaItem)
         if (boundedContextWindow != null && !ListenTogether.state.value.inParty) {
             saveBoundedContextSnapshot(exoPlayer)
@@ -4555,6 +4570,9 @@ class PlaybackService : MediaLibraryService() {
         val item = player.currentMediaItem ?: return
         val mediaId = item.mediaId
         val uri = item.localConfiguration?.uri
+        if (AddonSwitch.searchingMediaId.value == mediaId ||
+            uri?.getQueryParameter(QualityUpgrade.MARKER)?.startsWith(AddonSwitch.PREFIX) == true
+        ) return
         val alreadyPending = QualityUpgrade.isPending(mediaId)
         val shelved = QualityUpgrade.shelvedFor(mediaId)
         if (shelved == null && !alreadyPending && !QualityUpgrade.couldStillUpgrade(mediaId, uri)) return
@@ -4642,6 +4660,149 @@ class PlaybackService : MediaLibraryService() {
                 // that moves on cancels this job, and a cancelled swap has to
                 // put the badge out as surely as a completed one.
                 NerdStats.onLosslessRaceEnd(mediaId)
+            }
+        }
+    }
+
+    /** Searches without stopping playback; commits only a playable copy from an untried addon. */
+    private fun nextAddonNow() {
+        val active = player ?: return
+        val item = active.currentMediaItem ?: return
+        val uri = item.localConfiguration?.uri ?: return
+        val song = item.toSong()
+        if (ListenTogether.state.value.controlsLocked || song.isVideo || song.localUri != null ||
+            uri.scheme != "bitchord" || uri.authority !in setOf("watch", "source")
+        ) return
+        if (castPlayback.active || crossfade?.isTransitioning() == true) {
+            Toast.makeText(this, com.music.bitchord.R.string.next_addon_phone_only, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (addonSwitchJob?.isActive == true) return
+        if (active.playbackState != Player.STATE_READY) return
+
+        val mediaId = item.mediaId
+        val marker = uri.getQueryParameter(QualityUpgrade.MARKER)
+        val cachedOrigin = AudioCache.originOf(uri)
+        val currentSourceId = marker?.let { AddonSwitch.stream(mediaId, it)?.sourceConfigId }
+            ?: QualityUpgrade.forcedStream(uri)?.sourceConfigId
+            ?: StreamChoice.of(mediaId)?.sourceConfigId
+            ?: AddonSwitch.sourceFor(mediaId)
+            ?: AudioCache.sourceConfigIdOf(uri)
+            ?: uri.takeIf { it.authority == "source" && cachedOrigin != AudioCache.Origin.OTHER }
+                ?.getQueryParameter("s")
+        if (currentSourceId == null && cachedOrigin == AudioCache.Origin.OTHER) {
+            // Old cache entries knew only "addon", not which addon. Guessing would
+            // risk querying the rejected source again; new entries persist its ID.
+            Toast.makeText(this, com.music.bitchord.R.string.next_addon_unknown_cache, Toast.LENGTH_LONG).show()
+            return
+        }
+        currentSourceId?.let(rejectedAddonSources::add)
+        val attemptedSources = rejectedAddonSources
+        val target = TrackMatcher.targetOf(song)
+        val pendingUpgrade = upgradeJob
+        pendingUpgrade?.cancel()
+        QualityUpgrade.refuseUpgrades(mediaId)
+        QualityUpgrade.unshelve(mediaId)
+        NerdStats.onLosslessRaceEnd(mediaId)
+        AddonSwitch.searchingMediaId.value = mediaId
+        addonSwitchJob = scope.launch(TrackLog.about(mediaId)) {
+            try {
+                // An automatic audition must release its player before this one starts.
+                pendingUpgrade?.join()
+                while (true) {
+                    val stream = withContext(Dispatchers.IO) {
+                        SourceResolver.nextAddon(
+                            target = target,
+                            currentSourceId = currentSourceId,
+                            excludedSourceIds = attemptedSources.toSet(),
+                            onAttempt = { attemptedSources.add(it) },
+                        )
+                    }
+                    if (stream == null) {
+                        Toast.makeText(
+                            this@PlaybackService,
+                            com.music.bitchord.R.string.next_addon_no_match,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        return@launch
+                    }
+                    val live = player ?: return@launch
+                    if (live.currentMediaItem?.mediaId != mediaId ||
+                        live.currentMediaItem?.localConfiguration?.uri != uri || castPlayback.active ||
+                        crossfade?.isTransitioning() == true
+                    ) return@launch
+                    if (SourceRegistry.activeForPlayback().none { it.configId == stream.sourceConfigId }) continue
+                    val choice = AddonSwitch.remember(mediaId, stream)
+                    val nextUri = uri.buildUpon().clearQuery().apply {
+                        uri.queryParameterNames
+                            .filterNot { it == QualityUpgrade.MARKER || it == DIRECT_YOUTUBE_PARAMETER || it == "manifest_reopen" }
+                            .forEach { name -> uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) } }
+                        appendQueryParameter(QualityUpgrade.MARKER, choice)
+                    }.build()
+                    val at = SwapPoint(
+                        live.currentMediaItem ?: return@launch,
+                        uri.toString(),
+                        live.currentPosition,
+                        target.durationSec?.times(1000L) ?: live.duration,
+                    )
+                    val proven = try {
+                        auditionUpgrade(mediaId, at, nextUri.toString(), stream, renditionAlreadyFilled = false)
+                    } finally {
+                        // auditionUpgrade can be cancelled while warming the header, before
+                        // it constructs the player whose own finally clears this flag.
+                        QualityUpgrade.endAudition(mediaId)
+                    }
+                    if (proven == null) {
+                        withContext(Dispatchers.IO) { AudioCache.discardRendition(nextUri) }
+                        continue
+                    }
+                    val now = player ?: return@launch
+                    val current = now.currentMediaItem ?: return@launch
+                    if (current.mediaId != mediaId || current.localConfiguration?.uri != uri ||
+                        SourceRegistry.activeForPlayback().none { it.configId == stream.sourceConfigId } || castPlayback.active ||
+                        crossfade?.isTransitioning() == true
+                    ) return@launch
+                    val position = now.currentPosition.coerceAtLeast(0L).let { position ->
+                        target.durationSec?.times(1000L)?.takeIf { it > 0 }
+                            ?.let { position.coerceAtMost((it - 1).coerceAtLeast(0)) } ?: position
+                    }
+                    val sourceName = stream.sourceConfigId?.let { SourceRegistry.config(it)?.displayName } ?: "Addon"
+                    val metadata = current.mediaMetadata.buildUpon()
+                        .setExtras(Bundle(current.mediaMetadata.extras ?: Bundle()).apply {
+                            remove(EXTRA_QUALITY_UPGRADED)
+                        }).build()
+                    QualityUpgrade.forget(mediaId)
+                    QualityUpgrade.refuseUpgrades(mediaId)
+                    OriginalVersion.unpin(mediaId)
+                    AddonSwitch.recordSource(mediaId, stream.sourceConfigId)
+                    StreamContainer.served(mediaId, stream.url)
+                    NerdStats.clearDeclared(mediaId)
+                    NerdStats.onSourceStream(mediaId, stream.format, sourceName)
+                    NerdStats.recordSource(mediaId, sourceName)
+                    recoveries.remove(mediaId)
+                    crossfade?.onSkipRequested()
+                    swappingMediaId = mediaId
+                    now.replaceMediaItem(
+                        now.currentMediaItemIndex,
+                        current.buildUpon().setUri(nextUri).setMimeType(null)
+                            .setMediaMetadata(metadata).withResolvedStreamType(stream.url).build(),
+                    )
+                    now.seekTo(now.currentMediaItemIndex, position)
+                    now.prepare()
+                    Toast.makeText(
+                        this@PlaybackService,
+                        getString(com.music.bitchord.R.string.next_addon_playing, sourceName),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return@launch
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                TrackLog.w("BitChord", "next addon failed for $mediaId: ${error.message}", about = mediaId)
+                Toast.makeText(this@PlaybackService, com.music.bitchord.R.string.next_addon_failed, Toast.LENGTH_LONG).show()
+            } finally {
+                if (addonSwitchJob === coroutineContext[Job]) AddonSwitch.searchingMediaId.value = null
             }
         }
     }
@@ -5171,6 +5332,7 @@ class PlaybackService : MediaLibraryService() {
                 setMediaItem(
                     at.item.buildUpon()
                         .setUri(upgradedUri)
+                        .setMimeType(null)
                         .withResolvedStreamType(stream.url)
                         .build(),
                 )
@@ -5384,11 +5546,16 @@ class PlaybackService : MediaLibraryService() {
         previousFormat: StreamFormat?,
     ) {
         if (previousDuration <= 0) return
+        val watchedUri = player?.currentMediaItem?.localConfiguration?.uri ?: return
         scope.launch(TrackLog.about(mediaId)) {
             val agreed = withTimeoutOrNull(UPGRADE_PROVE_MS) {
                 while (true) {
                     val current = player?.takeIf { it.currentMediaItem?.mediaId == mediaId }
                         ?: return@withTimeoutOrNull false
+                    // A later explicit source choice supersedes this audition's verdict.
+                    if (current.currentMediaItem?.localConfiguration?.uri != watchedUri) {
+                        return@withTimeoutOrNull true
+                    }
                     val now = current.duration
                     if (now > 0) return@withTimeoutOrNull abs(now - previousDuration) <= upgradeLengthSlackMs
                     // The failure this whole check exists for, caught when it
@@ -5405,7 +5572,7 @@ class PlaybackService : MediaLibraryService() {
             if (agreed == true) return@launch
             val player = player ?: return@launch
             val item = player.currentMediaItem ?: return@launch
-            if (item.mediaId != mediaId) return@launch
+            if (item.mediaId != mediaId || item.localConfiguration?.uri != watchedUri) return@launch
             // State and buffered position alongside the length: a replacement
             // that loaded and disagreed about the track looks identical here
             // to one that never loaded at all, and only the second is a fault
@@ -6301,8 +6468,8 @@ class PlaybackService : MediaLibraryService() {
             artist = song.artist,
             artworkUrl = song.thumbnailUrl,
             // playWhenReady, not isPlaying — see MediaWidgetSnapshot.isPlaying.
-            // Through the session player, which answers for Cast or the watch
-            // while one of them is the speaker.
+            // Through the session player, which answers for Cast while the
+            // receiver is the speaker.
             isPlaying = playing ?: reported.playWhenReady,
             hasPrevious = exoPlayer.hasPreviousMediaItem(),
             hasNext = exoPlayer.hasNextMediaItem(),
@@ -6312,8 +6479,6 @@ class PlaybackService : MediaLibraryService() {
         )
         MediaWidgetSnapshot.save(this, snapshot)
         MediaWidget.refresh(this)
-        // The watch app follows the widget — same moments, same snapshot.
-        WearBridge.publish(this, snapshot, reported, playing)
     }
 
     private var foreignCachePurgeJob: Job? = null
@@ -7821,8 +7986,8 @@ class PlaybackService : MediaLibraryService() {
 
 
     override fun onDestroy() {
-        WearBridge.attachStreams(null)
-        WearBridge.releaseSpeaker()
+        addonSwitchJob?.cancel()
+        AddonSwitch.clear()
         // Let go of the receiver's player but leave its session alone: a
         // service that idles out while casting is not the listener choosing to
         // stop, and the next one picks the session up where it was.
@@ -8637,6 +8802,7 @@ class PlaybackService : MediaLibraryService() {
                 .add(beginRadioQueueCommand)
                 .add(commitRadioQueueCommand)
                 .add(upgradeQualityCommand)
+                .add(nextAddonCommand)
                 .add(swapVersionCommand)
                 .add(queueDragCommand)
                 .build()
@@ -8674,6 +8840,7 @@ class PlaybackService : MediaLibraryService() {
                 ACTION_BEGIN_RADIO_QUEUE -> beginRadioQueue()
                 ACTION_COMMIT_RADIO_QUEUE -> player?.let(::saveQueueSnapshotImmediately)
                 ACTION_UPGRADE_QUALITY -> upgradeQualityNow()
+                ACTION_NEXT_ADDON -> nextAddonNow()
                 ACTION_SWAP_VERSION -> {
                     val bundle = args.getBundle(EXTRA_SWAP_MEDIA_ITEM)
                     if (bundle != null) {

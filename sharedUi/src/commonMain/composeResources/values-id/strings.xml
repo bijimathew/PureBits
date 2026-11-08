@@ -198,4 +198,8 @@
     <string name="search_library_empty">Cari lagu di folder Musik Lokal Anda.</string>
     <string name="search_library_hint">Lagu, Artis, dan Album</string>
     <string name="search_library_no_results">Tidak ada di Musik Lokal yang cocok dengan “%1$s”.</string>
+    <string name="next_addon">Cari di sumber berikutnya</string>
+    <string name="next_addon_description">Cari lagu ini di sumber addon berikutnya</string>
+    <string name="next_addon_searching">Mencari di sumber berikutnya…</string>
+    <string name="automix_overview_unavailable">Tidak ada transisi Automix yang akan datang</string>
 </resources>

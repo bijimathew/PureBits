@@ -1396,4 +1396,13 @@
     <string name="bit_perfect_status_inexact">%1$s · non esatto: questa sorgente non è PCM lossless</string>
     <string name="bit_perfect_status_waiting">In attesa di un brano lossless su un\'uscita supportata</string>
     <string name="bit_perfect_status_unavailable">Non disponibile per questo brano (%1$s)</string>
+    <string name="next_addon_no_match">Nessun brano corrispondente trovato nelle estensioni rimanenti utilizzabili. La sorgente attuale resta invariata.</string>
+    <string name="next_addon_failed">Impossibile cambiare estensione. Riprova.</string>
+    <string name="next_addon_playing">Riproduzione da %1$s</string>
+    <string name="next_addon_phone_only">Prova un\'altra sorgente quando la riproduzione avviene su questo telefono e non è in corso una transizione.</string>
+    <string name="next_addon_unknown_cache">Questo brano salvato in precedenza nella cache non contiene informazioni sull\'estensione. Svuota la cache audio, riproducilo nuovamente e riprova.</string>
+    <string name="automix_overview">Panoramica Automix</string>
+    <string name="diwali_title">BitChord ti augura un felice Diwali</string>
+    <string name="diwali_subtitle">Che questa festa delle luci riempia la tua casa di gioia e le tue giornate di musica.</string>
+    <string name="diwali_cta">Festeggiamo</string>
 </resources>

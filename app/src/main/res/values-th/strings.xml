@@ -1440,4 +1440,13 @@
     <string name="bit_perfect_status_inexact">%1$s · ไม่ตรงทุกบิต: แหล่งนี้ไม่ใช่ PCM แบบไม่สูญเสียคุณภาพ</string>
     <string name="bit_perfect_status_waiting">กำลังรอแทร็กแบบไม่สูญเสียคุณภาพบนเอาต์พุตที่รองรับ</string>
     <string name="bit_perfect_status_unavailable">ไม่พร้อมใช้งานสำหรับแทร็กนี้ (%1$s)</string>
+    <string name="next_addon_no_match">ไม่พบเพลงที่ตรงกันในส่วนเสริมที่เหลือซึ่งใช้งานได้ แหล่งที่มาปัจจุบันยังคงเดิม</string>
+    <string name="next_addon_failed">ไม่สามารถสลับส่วนเสริมได้ ลองอีกครั้ง</string>
+    <string name="next_addon_playing">กำลังเล่นจาก %1$s</string>
+    <string name="next_addon_phone_only">ลองแหล่งที่มาอื่นเมื่อกำลังเล่นบนโทรศัพท์เครื่องนี้และไม่มีการเปลี่ยนผ่านเพลง</string>
+    <string name="next_addon_unknown_cache">เพลงที่แคชไว้ก่อนหน้านี้ไม่มีรายละเอียดส่วนเสริม ล้างแคชเสียง เล่นเพลงอีกครั้ง แล้วลองใหม่</string>
+    <string name="automix_overview">ภาพรวม Automix</string>
+    <string name="diwali_title">BitChord ขอให้คุณมีความสุขในเทศกาลดิวาลี</string>
+    <string name="diwali_subtitle">ขอให้เทศกาลแห่งแสงสว่างนี้เติมเต็มบ้านของคุณด้วยความสุขและทุกวันด้วยเสียงเพลง</string>
+    <string name="diwali_cta">มาฉลองกัน</string>
 </resources>
