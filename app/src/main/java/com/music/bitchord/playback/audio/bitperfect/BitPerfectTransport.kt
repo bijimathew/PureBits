@@ -15,8 +15,8 @@ import java.nio.ByteBuffer
  * One exclusive, mixer-free output opened at a track's own rate and channel
  * count, or at the closest the DAC offers when it cannot take the track's own;
  * [sampleRate] and [validBits] say which. [BitPerfectAudioSink] owns exactly
- * one at a time and drives it from the playback thread; nothing here
- * resamples, mixes or applies gain.
+ * one at a time and drives it from the playback thread. Direct USB can apply
+ * software gain without resampling or involving Android's mixer.
  *
  * Every call except [release] may throw [BitPerfectTransportException] once
  * the route is lost. The sink turns that into a recoverable Media3 error, so
@@ -38,6 +38,14 @@ internal interface BitPerfectTransport {
 
     /** How much audio the transport itself buffers, in frames. */
     val bufferSizeFrames: Long
+
+    /** Non-null only for exclusive USB with software volume (dB, including a true mute sentinel). */
+    val softwareVolumeDb: Double? get() = null
+    val softwareAttenuationDb: Double? get() = softwareVolumeDb
+    val samplesUnchanged: Boolean get() = true
+
+    /** Separate from the user's DAC setting: Media3 mute and audio-focus ducking. */
+    fun setPlayerVolume(volume: Float) = Unit
 
     /** Copies as much of [buffer] as fits without blocking; returns the byte count taken. */
     fun write(buffer: ByteBuffer): Int
@@ -71,3 +79,6 @@ internal enum class BitPerfectDriver(val label: String, val releasesWhenIdle: Bo
 }
 
 internal class BitPerfectTransportException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/** Marks output safety failures so stream recovery cannot retry them as addon failures. */
+internal class DirectUsbSafetyException(message: String, cause: Throwable? = null) : Exception(message, cause)

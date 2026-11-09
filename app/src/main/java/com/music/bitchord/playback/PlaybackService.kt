@@ -91,6 +91,7 @@ import com.music.bitchord.playback.audio.bitperfect.BitPerfectAudioSink
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectRoutingSink
 import com.music.bitchord.playback.audio.bitperfect.DacVolume
+import com.music.bitchord.playback.audio.bitperfect.DirectUsbSafetyException
 import com.music.bitchord.playback.audio.bitperfect.usb.UsbDirectDevices
 import com.music.bitchord.playback.audio.bluetooth.BluetoothAudioTracker
 import com.music.bitchord.playback.audio.bluetooth.BluetoothTelemetry
@@ -3996,6 +3997,26 @@ class PlaybackService : MediaLibraryService() {
      * starting over.
      */
     private fun recoverFrom(error: PlaybackException, player: ExoPlayer) {
+        val usbSafetyFailure = generateSequence<Throwable>(error) { it.cause }.take(16)
+            .any { it is DirectUsbSafetyException }
+        if (usbSafetyFailure || (AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT &&
+            error.errorCode in setOf(
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED,
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_INIT_FAILED,
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_WRITE_FAILED,
+            ))
+        ) {
+            // This is an output failure, not a failed addon recording. A new
+            // source/retry must never bypass the direct driver's gain policy.
+            eachPlayer { it.pause() }
+            BitPerfectOutput.resetSoftwareVolumeSession()
+            val message = getString(com.music.bitchord.R.string.usb_direct_stopped)
+            BitPerfectOutput.publishStopped(message)
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            TrackLog.w("AUDIO_OUT", "Direct USB stopped; check device/permission or choose another output", error)
+            return
+        }
         val item = player.currentMediaItem ?: return
         val mediaId = item.mediaId
         val uri = item.localConfiguration?.uri
@@ -7421,6 +7442,7 @@ class PlaybackService : MediaLibraryService() {
         // mode is chosen and again whenever a DAC is attached; an answer, an
         // attach or a detach all send the playing track back to be re-routed.
         UsbDirectDevices.init(this)
+        BitPerfectOutput.resetSoftwareVolumeSession()
         BitPerfectOutput.watch(this)
         scope.launch {
             var available = false
@@ -7448,11 +7470,23 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch {
-            AppSettings.bitPerfectMode.drop(1).collect { requestOutputReconfiguration(rebuild = true) }
+            var previousMode = AppSettings.bitPerfectMode.value
+            AppSettings.bitPerfectMode.drop(1).collect { mode ->
+                if (previousMode == BitPerfectMode.USB_DIRECT || mode == BitPerfectMode.USB_DIRECT) {
+                    BitPerfectOutput.resetSoftwareVolumeSession()
+                    // Android output has independent hardware/system volume;
+                    // entering/leaving direct USB requires another play action.
+                    eachPlayer { it.pause() }
+                }
+                previousMode = mode
+                requestOutputReconfiguration(rebuild = true)
+            }
         }
         scope.launch {
-            AppSettings.usbAllowFixedVolume.drop(1).collect {
+            AppSettings.usbDirectVolumeMode.drop(1).collect {
                 if (AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT) {
+                    BitPerfectOutput.resetSoftwareVolumeSession()
+                    eachPlayer { it.pause() }
                     requestOutputReconfiguration(rebuild = true)
                 }
             }

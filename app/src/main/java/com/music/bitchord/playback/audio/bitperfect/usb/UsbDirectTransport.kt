@@ -12,6 +12,8 @@ package com.music.bitchord.playback.audio.bitperfect.usb
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
+import android.util.Log
+import com.music.bitchord.data.settings.UsbDirectVolumeMode
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectDriver
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectTransport
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectTransportException
@@ -54,23 +56,23 @@ internal object UsbDirectNative {
  * a native worker drives its isochronous endpoint with libusb, detaching
  * Android's own USB audio driver for as long as the stream is open.
  *
- * Volume is the DAC's Feature Unit, never the samples. Before the first
- * transfer every controlled channel is brought down to at most -40 dB, and a
- * level the listener chose earlier on the same DAC is put back only as far as
- * the DAC's own knob now allows. On release the DAC is returned to the level
- * it had before the stream opened. A DAC with no usable volume control plays
- * only if the listener has explicitly allowed fixed-volume output.
+ * Auto and Software modes never issue hardware volume writes. Every PCM byte
+ * passes through [UsbPcmWriteGate] before JNI. Hardware control is opt-in;
+ * missing/invalid hardware controls fall back to software, never fixed output.
+ * No mode restores a potentially loud DAC level on release.
  *
  * A failure never redirects to the phone speaker from here: the transport
  * stops, and the sink's owner decides what plays next.
  */
 internal class UsbDirectTransport private constructor(
     private val connection: UsbDeviceConnection,
-    private var handle: Long,
+    @Volatile private var handle: Long,
     val usbDeviceId: Int,
+    val volumeDeviceKey: String,
     override val deviceName: String,
     private val format: UsbDescriptors.OutputFormat,
     private val volumeControl: UsbVolume.Volume?,
+    initialSoftwareDb: Double?,
 ) : BitPerfectTransport {
 
     override val driver = BitPerfectDriver.USB_DIRECT
@@ -84,8 +86,27 @@ internal class UsbDirectTransport private constructor(
 
     @Volatile private var failure: String? = null
     private var lastFrames = 0L
+    @Volatile private var softwareDb = initialSoftwareDb
+    @Volatile private var playerVolume = 1f
+    override val softwareVolumeDb: Double? get() = softwareDb
+    override val softwareAttenuationDb: Double?
+        get() = gain.targetDb.takeIf { softwareDb != null || it < 0.0 }
+    private val gain = UsbSoftwareGain(
+        sampleRate, channelCount,
+        when (outputBits) {
+            16 -> UsbSoftwareGain.Format.PCM_16
+            24 -> UsbSoftwareGain.Format.PCM_24
+            32 -> UsbSoftwareGain.Format.PCM_32
+            else -> error("Unsupported USB PCM slot")
+        },
+        initialDb = initialSoftwareDb ?: 0.0,
+    )
+    private val writer = UsbPcmWriteGate(channelCount, format.subslot, sampleRate, gain) { data, offset, count ->
+        UsbDirectNative.write(handle, data, offset, count)
+    }
+    override val samplesUnchanged: Boolean get() = gain.atUnity
 
-    private val control = UsbControl { input, request, value, index, data ->
+    private val control: UsbControl = UsbControl { input, request, value, index, data ->
         val reply = UsbDirectNative.control(handle, input, request, value, index, data)
         if (input) reply.copyInto(data)
     }
@@ -95,17 +116,41 @@ internal class UsbDirectTransport private constructor(
     /** Called off the playback thread; the native worker serializes it with streaming. */
     fun setVolume(db: Double): UsbVolume.Snapshot {
         val volume = volumeControl ?: throw IllegalStateException("USB hardware volume unavailable")
-        return synchronized(volume) { volume.set(control, db) }
+        return try {
+            synchronized(volume) { volume.set(control, db) }
+        } catch (error: Exception) {
+            // A partial per-channel write is not a usable volume state. Stop
+            // before handing the interface to any other route or owner.
+            fail("USB hardware volume failed")
+            throw error
+        }
+    }
+
+    @Synchronized
+    fun setSoftwareVolume(db: Double): Double {
+        check(failure == null && handle != 0L) { "USB output stopped" }
+        check(softwareDb != null) { "USB software volume is not active" }
+        val target = UsbSoftwareVolumePolicy.normalizeDb(db)
+        softwareDb = target
+        gain.setTargetDb(UsbSoftwareVolumePolicy.combinedDb(softwareDb, playerVolume))
+        return target
+    }
+
+    @Synchronized
+    override fun setPlayerVolume(volume: Float) {
+        check(failure == null && handle != 0L) { "USB output stopped" }
+        playerVolume = volume
+        gain.setTargetDb(UsbSoftwareVolumePolicy.combinedDb(softwareDb, playerVolume))
     }
 
     fun markDetached() {
-        failure = "USB disconnected"
+        fail("USB disconnected")
     }
 
+    fun markFailedVolume() = fail("USB volume state could not be established")
+
     override fun write(buffer: ByteBuffer): Int {
-        val count = call { UsbDirectNative.write(handle, buffer, buffer.position(), minOf(buffer.remaining(), MAX_WRITE)) }
-        buffer.position(buffer.position() + count)
-        return count
+        return call { writer.write(buffer) }
     }
 
     override fun play() = call { UsbDirectNative.setPlaying(handle, true) }
@@ -114,6 +159,7 @@ internal class UsbDirectTransport private constructor(
 
     override fun flush() {
         call { UsbDirectNative.flush(handle) }
+        writer.flush()
         lastFrames = 0
     }
 
@@ -121,38 +167,46 @@ internal class UsbDirectTransport private constructor(
     override fun stop() = Unit
 
     override fun playedFrames(): Long {
-        if (handle == 0L || failure != null) return lastFrames
-        lastFrames = maxOf(lastFrames, runCatching { UsbDirectNative.frames(handle) }.getOrDefault(lastFrames))
+        failure?.let { throw BitPerfectTransportException(it) }
+        if (handle == 0L) return lastFrames
+        lastFrames = maxOf(lastFrames, call { UsbDirectNative.frames(handle) })
         return lastFrames
     }
 
     override fun release() {
-        // Leave the DAC at the volume it had before this stream lowered it;
-        // the next owner, Android's driver or another app, expects that level.
-        // Pointless once it is unplugged, and a closed handle cannot be asked.
-        if (handle != 0L && failure == null) {
-            volumeControl?.let { volume -> runCatching { synchronized(volume) { volume.restore(control) } } }
-        }
+        // Stop/cancel queued samples before releasing interfaces. In particular,
+        // never restore an old (possibly 0 dB) hardware level while PCM is queued.
+        gain.setTargetDb(UsbSoftwareVolumePolicy.MUTE_DB)
+        if (handle != 0L) runCatching { UsbDirectNative.setPlaying(handle, false) }
         // The worker joins (cancelling and acknowledging every transfer, then
         // releasing the interfaces) before Android closes the descriptor.
-        if (handle != 0L) UsbDirectNative.close(handle)
+        if (handle != 0L) runCatching { UsbDirectNative.close(handle) }
         handle = 0
+        writer.flush()
         runCatching { connection.close() }
+    }
+
+    @Synchronized
+    private fun fail(reason: String) {
+        failure = reason
+        gain.setTargetDb(UsbSoftwareVolumePolicy.MUTE_DB)
+        if (handle != 0L) {
+            runCatching { UsbDirectNative.setPlaying(handle, false) }
+            runCatching { UsbDirectNative.flush(handle) }
+        }
     }
 
     private inline fun <T> call(block: () -> T): T {
         failure?.let { throw BitPerfectTransportException(it) }
         return try {
             block()
-        } catch (error: IllegalStateException) {
-            failure = error.message ?: "USB output failed"
+        } catch (error: Exception) {
+            fail(error.message ?: "USB output failed")
             throw BitPerfectTransportException(failure!!, error)
         }
     }
 
     companion object {
-        private const val MAX_WRITE = 256 * 1024
-
         fun open(
             manager: UsbManager,
             device: UsbDevice,
@@ -160,7 +214,8 @@ internal class UsbDirectTransport private constructor(
             channels: Int,
             sourceBits: Int,
             convert: Boolean,
-            allowFixedVolume: Boolean,
+            volumeMode: UsbDirectVolumeMode,
+            softwareVolumeDb: Double,
             rememberedDb: Double?,
         ): UsbDirectTransport {
             val connection = manager.openDevice(device) ?: throw BitPerfectTransportException("cannot_open_usb")
@@ -180,20 +235,35 @@ internal class UsbDirectTransport private constructor(
                     val reply = UsbDirectNative.control(opened, input, request, value, index, data)
                     if (input) reply.copyInto(data)
                 }
-                // Startup attenuation happens inside Volume.open, before any audio.
-                val volume = UsbVolume.feature(raw, plan.alternate.control, plan.alternate.terminal, channels)
-                    ?.let { feature -> runCatching { UsbVolume.Volume.open(control, feature) }.getOrNull() }
-                if (volume == null && !allowFixedVolume) throw BitPerfectTransportException("volume_unavailable")
-                if (volume != null && rememberedDb != null) {
-                    runCatching { volume.set(control, minOf(rememberedDb, volume.snapshot.restoreLimitDb)) }
+                // The native worker starts paused with an empty queue. In Auto
+                // mode all DACs get software volume; descriptors/readback cannot
+                // establish the real acoustic effect of a hardware control.
+                val selection = UsbDirectVolumeSelection.select(volumeMode, softwareVolumeDb) {
+                    UsbVolume.feature(raw, plan.alternate.control, plan.alternate.terminal, channels)
+                        ?.let { feature ->
+                            UsbVolume.Volume.open(control, feature).also { volume ->
+                                if (rememberedDb != null) {
+                                    // Explicit hardware mode preserves a level
+                                    // chosen this attachment, respecting a knob
+                                    // that was subsequently turned down.
+                                    volume.set(control, minOf(rememberedDb, volume.snapshot.restoreLimitDb))
+                                }
+                            }
+                        }
                 }
+                val volume = selection.hardware
+                Log.i("UsbDirectTransport", "USB ${device.vendorId}:${device.productId}, " +
+                    "${plan.format.sampleRate} Hz/${plan.format.bits} bits in ${plan.format.subslot * 8}, " +
+                    "volume=${if (volume == null) "software" else "hardware"}")
                 return UsbDirectTransport(
                     connection = connection,
                     handle = handle,
                     usbDeviceId = device.deviceId,
+                    volumeDeviceKey = UsbDirectDevices.volumeKey(device),
                     deviceName = device.productName?.takeIf { it.isNotBlank() } ?: "USB audio",
                     format = plan.format,
                     volumeControl = volume,
+                    initialSoftwareDb = selection.softwareDb,
                 )
             } catch (error: Exception) {
                 if (handle != 0L) UsbDirectNative.close(handle)
@@ -210,6 +280,8 @@ internal class UsbDirectTransport private constructor(
                 return emptyList()
             }
             return UsbDescriptors.dacFormats(device, rate, channels, sourceBits, convert)
+                // Software gain must never scale framed DoP or native DSD.
+                .filter { (_, format) -> format.encoding == UsbDescriptors.Encoding.PCM }
                 .mapNotNull { (alternate, format) -> UsbDescriptors.plan(alternate, format) }
                 .take(32)
         }

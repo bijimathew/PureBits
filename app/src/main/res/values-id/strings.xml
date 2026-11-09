@@ -1409,16 +1409,16 @@
     <string name="font_footer">Lama mengembalikan huruf yang lebih tebal dan rapat yang dipakai aplikasi sebelum disamakan dengan Apple Music.</string>
     <string name="bit_perfect_output">Output bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">Output bit-perfect sudah siap, jadi pengaturan yang redup dilewati dan versi Dolby Atmos tidak diminta. Semuanya berfungsi lagi saat DAC dilepas atau mode dimatikan.</string>
-    <string name="bit_perfect_sheet_warning">Mengirim trek ke DAC tanpa perubahan. Equalizer, normalisasi kenyaringan, crossfade, Automix, kecepatan putar, dan volume BitChord dilewati.</string>
+    <string name="bit_perfect_sheet_warning">Keluaran eksklusif melewati efek, normalisasi, crossfade dan kecepatan. USB langsung dapat memakai volume perangkat lunak; sampel yang diubah tidak bit-perfect.</string>
     <string name="bit_perfect_mode_off_subtitle">Audio melewati mixer Android dan efek BitChord.</string>
-    <string name="bit_perfect_mode_usb_android">DAC USB</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 membuka DAC pada rate dan kedalaman bit masing-masing trek, tanpa mixing atau resampling.</string>
+    <string name="bit_perfect_mode_usb_android">DAC USB (jalur asli Android)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Memerlukan Android 14+ dan dukungan USB bit-perfect dari ponsel. Android mungkin tidak menyediakan mode ini untuk DAC yang terhubung.</string>
     <string name="bit_perfect_requires_android_14">Memerlukan Android 14 atau lebih baru</string>
     <string name="bit_perfect_mode_dap_exclusive">DAC bawaan (AAudio eksklusif)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">Untuk pemutar musik dengan DAC sendiri. Membuka output headphone atau line secara eksklusif pada rate masing-masing trek. Tidak semua perangkat memberikan mode eksklusif.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Untuk keluaran headphone atau line bawaan berkabel, bukan earphone USB. Android harus memberi mode eksklusif; banyak ponsel tidak mendukungnya.</string>
     <string name="bit_perfect_requires_android_8_1">Memerlukan Android 8.1 atau lebih baru</string>
     <string name="bit_perfect_mode_usb_direct">DAC USB (driver langsung)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord mengendalikan DAC sendiri, di versi Android apa pun, dan mengatur volumenya di DAC. Meminta izin USB. Bisa jauh lebih keras daripada output normal.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">Otomatis memakai volume perangkat lunak. Pakai perangkat keras hanya jika kontrolnya sudah diperiksa.</string>
     <string name="dac_volume">Volume DAC</string>
     <string name="dac_volume_subtitle">Diatur di DAC itu sendiri; musik tidak diskalakan</string>
     <string name="usb_allow_fixed_volume">Izinkan DAC tanpa kontrol volume</string>
@@ -1427,8 +1427,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord tidak bisa mengatur volume DAC jenis ini, jadi DAC memutar pada skala penuh dan hanya kenopnya sendiri, jika ada, yang mengatur kenyaringan. Ini bisa sangat keras dan berbahaya dengan headphone sensitif.</string>
     <string name="convert_for_limited_dac">Konversi untuk DAC spesifikasi rendah</string>
     <string name="convert_for_limited_dac_subtitle">Mengonversi trek di atas batas DAC Anda ke format tertingginya. Trek mungkin lebih lama dimulai dan tidak akan bit-perfect terhadap aslinya.</string>
-    <string name="bit_perfect_confirm_title">Aktifkan output bit-perfect?</string>
-    <string name="bit_perfect_confirm_message">DAC menerima musik pada skala penuh, dan tombol volume ponsel mungkin berhenti berfungsi. Kecilkan DAC atau amplifier sebelum memutar.</string>
+    <string name="bit_perfect_confirm_title">Aktifkan keluaran eksklusif?</string>
+    <string name="bit_perfect_confirm_message">Lepaskan earphone sebelum pemutaran pertama dan periksa level sebenarnya. USB langsung mulai dengan volume perangkat lunak rendah. Mode lain mungkin bergantung pada volume DAC.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-bit</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d-bit · maksimum DAC, dikonversi dari format trek ini</string>
     <string name="bit_perfect_status_inexact">%1$s · tidak persis: sumber ini bukan PCM lossless</string>
@@ -1443,4 +1443,22 @@
     <string name="diwali_title">BitChord mengucapkan selamat Diwali</string>
     <string name="diwali_subtitle">Semoga festival cahaya ini memenuhi rumahmu dengan kebahagiaan dan hari-harimu dengan musik.</string>
     <string name="diwali_cta">Mari rayakan</string>
+    <string name="usb_direct_volume_mode" formatted="false">Mode volume USB langsung</string>
+    <string name="usb_volume_auto" formatted="false">Otomatis</string>
+    <string name="usb_volume_hardware" formatted="false">Volume perangkat keras</string>
+    <string name="usb_volume_software" formatted="false">Volume perangkat lunak aman</string>
+    <string name="usb_volume_mode_description" formatted="false">Otomatis memakai volume perangkat lunak. Pakai perangkat keras hanya jika kontrolnya sudah diperiksa.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">Sesi USB baru mulai pada -40 dB atau lebih rendah; 0% membisukan. Persentase bukan batas keamanan pendengaran.</string>
+    <string name="usb_high_volume_title" formatted="false">Izinkan volume USB lebih tinggi?</string>
+    <string name="usb_high_volume_warning" formatted="false">Level di atas -20 dB bisa sangat keras. Lepaskan earphone sebelum menaikkan volume. Ini mengizinkan level lebih tinggi untuk sesi USB ini, bukan jaminan volume aman.</string>
+    <string name="usb_high_volume_allow" formatted="false">Saya mengerti</string>
+    <string name="usb_hardware_volume_warning" formatted="false">Laporan perangkat keras bisa keliru. Gunakan perangkat lunak untuk Bunny DSP atau perangkat yang belum pasti. Lepaskan earphone sebelum menguji perangkat keras. Jika gagal, digunakan perangkat lunak atau pemutaran berhenti.</string>
+    <string name="bit_perfect_status_software">%1$s · USB eksklusif · volume perangkat lunak %2$s dB</string>
+    <string name="usb_direct_stopped">Pemutaran USB dihentikan. Periksa DAC dan izin USB, atau pilih keluaran lain sebelum memutar lagi.</string>
+    <string name="bit_perfect_unavailable_no_usb">Hubungkan DAC USB. Jika USB langsung baru melepasnya, tunggu Android menyambungkan kembali rute audio.</string>
+    <string name="bit_perfect_unavailable_no_wired">Mode ini memerlukan keluaran headphone atau line bawaan berkabel. Earphone USB memakai mode DAC USB.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android tidak menyediakan mixer USB bit-perfect yang dapat dipakai untuk DAC ini. Android 14 saja tidak menjamin dukungan.</string>
+    <string name="bit_perfect_unavailable_permission">Izin USB diperlukan. Pilih USB langsung dan setujui permintaan sistem.</string>
+    <string name="bit_perfect_unavailable_format">Tidak ada format eksklusif yang cocok untuk lagu ini. Pilih keluaran lain untuk melanjutkan.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android menolak pemutaran AAudio yang benar-benar eksklusif pada keluaran berkabel.</string>
 </resources>

@@ -10,18 +10,19 @@
 package com.music.bitchord.playback.audio.bitperfect
 
 import com.music.bitchord.playback.audio.bitperfect.usb.UsbVolume
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbSoftwareVolumePolicy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * The DAC's hardware volume as one 0..1 level, for everything that is not a
+ * Direct USB volume as one 0..1 level, for everything that is not a
  * settings slider in dB: the player's volume bar, the volume keys, the
  * system's remote-volume panel and the volume HUD.
  *
  * While direct USB output is open this *is* the app's volume: Android's
- * music stream no longer reaches the DAC, and nothing upstream may scale a
- * sample. [level] is null whenever there is no such DAC, and every caller
+ * music stream no longer reaches the DAC. Hardware and final software gain
+ * use the same control surface. [level] is null whenever there is no such DAC, and every caller
  * falls back to the system volume then.
  *
  * Mornye maps its slider linearly across the DAC's whole dB range. Many DACs
@@ -44,19 +45,72 @@ internal object DacVolume {
     val level: StateFlow<Float?> = _level.asStateFlow()
 
     private var snapshot: UsbVolume.Snapshot? = null
+    private var software = false
+    private var highVolumeAuthorized = false
+    private var pendingHighFraction: Float? = null
+    private val _highVolumeRequested = MutableStateFlow(false)
+    val highVolumeRequested: StateFlow<Boolean> = _highVolumeRequested.asStateFlow()
 
     /** Called by [BitPerfectOutput] whenever the DAC reports its volume, or stops having one. */
     @Synchronized
     internal fun onSnapshot(value: UsbVolume.Snapshot?) {
+        software = false
         snapshot = value
         _level.value = value?.takeIf { it.available }?.let(::fractionOf)
+    }
+
+    /** The transport supplies the actual applied target; UI never guesses its starting level. */
+    @Synchronized
+    internal fun onSoftwareVolume(db: Double?) {
+        software = db != null
+        snapshot = null
+        _level.value = db?.let { UsbSoftwareVolumePolicy.dbToFraction(it).toFloat() }
+        if (db == null) dismissHighVolume()
+    }
+
+    /** Reset only at a real device/output/service session boundary, not between tracks. */
+    @Synchronized
+    internal fun resetSoftwareSession() {
+        highVolumeAuthorized = false
+        dismissHighVolume()
+    }
+
+    @Synchronized
+    fun dismissHighVolume() {
+        pendingHighFraction = null
+        _highVolumeRequested.value = false
+    }
+
+    /** A foreground dialog is the only way past the software high-output threshold. */
+    @Synchronized
+    fun confirmHighVolume() {
+        val wanted = pendingHighFraction
+        dismissHighVolume()
+        if (!software || wanted == null) return
+        highVolumeAuthorized = true
+        set(wanted)
     }
 
     /** Sets the DAC to [fraction] of its travel. */
     @Synchronized
     fun set(fraction: Float) {
+        if (_level.value == null) return
+        var target = if (fraction.isFinite()) fraction.coerceIn(0f, 1f) else 0f
+        if (software) {
+            val ceiling = UsbSoftwareVolumePolicy.dbToFraction(UsbSoftwareVolumePolicy.HIGH_LEVEL_DB).toFloat()
+            if (target > ceiling && !highVolumeAuthorized) {
+                pendingHighFraction = target
+                _highVolumeRequested.value = true
+                target = ceiling
+            } else if (target <= ceiling) {
+                // A later down/mute request supersedes the proposed increase.
+                dismissHighVolume()
+            }
+            _level.value = target
+            BitPerfectOutput.setSoftwareVolume(UsbSoftwareVolumePolicy.fractionToDb(target.toDouble()))
+            return
+        }
         val volume = snapshot?.takeIf { it.available } ?: return
-        val target = fraction.coerceIn(0f, 1f)
         _level.value = target
         BitPerfectOutput.setHardwareVolume(dbOf(volume, target))
     }
@@ -68,10 +122,12 @@ internal object DacVolume {
     @Synchronized
     fun step(direction: Int): Boolean {
         val current = _level.value ?: return false
-        val next = ((Math.round(current * STEPS) + direction).coerceIn(0, STEPS)).toFloat() / STEPS
+        // Software keys move 1 dB at a time; rapid repeats still stop at the confirmation gate.
+        val steps = if (software) 80 else STEPS
+        val next = ((Math.round(current * steps) + direction.coerceIn(-1, 1)).coerceIn(0, steps)).toFloat() / steps
         if (next == current) return false
         set(next)
-        return true
+        return _level.value != current
     }
 
     internal fun fractionOf(volume: UsbVolume.Snapshot): Float {

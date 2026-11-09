@@ -116,6 +116,13 @@ internal class ExclusiveTransport private constructor(
     }
 
     companion object {
+        fun wiredDevice(manager: AudioManager): AudioDeviceInfo? =
+            manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull {
+                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                    it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                    it.type == AudioDeviceInfo.TYPE_LINE_ANALOG
+            }
+
         /** The native side refuses larger single writes. */
         private const val MAX_WRITE = 262_144
 
@@ -127,10 +134,10 @@ internal class ExclusiveTransport private constructor(
 
         fun open(manager: AudioManager, rate: Int, channels: Int, sourceBits: Int, convert: Boolean): ExclusiveTransport {
             val outputs = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            val wired = outputs.firstOrNull {
-                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET
-            }
-            val offered = wired?.sampleRates?.takeIf { it.isNotEmpty() }?.toList() ?: BitPerfectPcm.STANDARD_RATES
+            // This option is for a built-in wired DAC. Never silently ask for
+            // device 0 (possibly USB or the phone speaker) under that label.
+            val wired = wiredDevice(manager) ?: throw BitPerfectTransportException("no_wired_output")
+            val offered = wired.sampleRates.takeIf { it.isNotEmpty() }?.toList() ?: BitPerfectPcm.STANDARD_RATES
             val rates = if (convert) BitPerfectPcm.rankRates(rate, offered + rate).take(MAX_RATE_ATTEMPTS) else listOf(rate)
             val depths = if (convert) listOf(32, 24, 16).filter { it <= sourceBits } else listOf(sourceBits)
             var openedRate = rate
@@ -139,7 +146,7 @@ internal class ExclusiveTransport private constructor(
             search@ for (candidate in rates) {
                 for (bits in depths) {
                     try {
-                        handle = ExclusiveNative.open(candidate, channels, bits, wired?.id ?: 0)
+                        handle = ExclusiveNative.open(candidate, channels, bits, wired.id)
                         openedRate = candidate
                         break@search
                     } catch (error: IllegalStateException) {

@@ -39,6 +39,21 @@ internal object UsbDirectDevices {
     private var requested: Int? = null
     private val descriptors = HashMap<Int, ByteArray>()
     private val volumes = HashMap<Int, Double>()
+    private val softwareVolumes = UsbSoftwareVolumeMemory(
+        read = { key -> volumePrefs()?.getString(key, null)?.toDoubleOrNull() },
+        persist = { key, db -> volumePrefs()?.edit()?.putString(key, db.toString())?.apply() },
+    )
+
+    private fun volumePrefs() = appContext?.getSharedPreferences("usb_software_volume", Context.MODE_PRIVATE)
+
+    /** Model identity from the real device, never guessed from a product name or a fixed VID/PID. */
+    fun volumeKey(device: UsbDevice) = "${device.vendorId}:${device.productId}:${device.version}"
+
+    fun softwareVolume(device: UsbDevice): Double = softwareVolumes.level(volumeKey(device))
+
+    fun rememberSoftwareVolume(key: String, db: Double) = softwareVolumes.remember(key, db)
+
+    fun resetSoftwareSession() = softwareVolumes.reset()
 
     /** A DAC was attached, detached or granted: whatever is playing should decide again. */
     @Volatile var onChanged: (() -> Unit)? = null
@@ -55,6 +70,7 @@ internal object UsbDirectDevices {
                     synchronized(this@UsbDirectDevices) {
                         descriptors.remove(device.deviceId)
                         volumes.remove(device.deviceId)
+                        softwareVolumes.reset(volumeKey(device))
                         if (requested == device.deviceId) requested = null
                     }
                     onDetached?.invoke(device.deviceId)

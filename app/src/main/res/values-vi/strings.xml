@@ -1349,16 +1349,16 @@
     <string name="font_footer">Cổ điển mang lại kiểu chữ dày và khít hơn mà ứng dụng từng dùng trước khi được đồng bộ với Apple Music.</string>
     <string name="bit_perfect_output">Đầu ra bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">Đầu ra bit-perfect đã sẵn sàng nên các cài đặt bị làm mờ sẽ được bỏ qua và các phiên bản Dolby Atmos không được yêu cầu. Chúng hoạt động lại khi ngắt kết nối DAC hoặc tắt chế độ này.</string>
-    <string name="bit_perfect_sheet_warning">Gửi bản nhạc đến DAC mà không thay đổi. Bộ chỉnh âm, chuẩn hóa âm lượng, chuyển bài mượt, Automix, tốc độ phát và âm lượng của BitChord được bỏ qua.</string>
+    <string name="bit_perfect_sheet_warning">Đầu ra độc quyền bỏ qua hiệu ứng, chuẩn hóa, chuyển tiếp và tốc độ. USB trực tiếp có thể dùng âm lượng phần mềm; mẫu bị thay đổi không còn bit-perfect.</string>
     <string name="bit_perfect_mode_off_subtitle">Âm thanh đi qua bộ trộn của Android và các hiệu ứng của BitChord.</string>
-    <string name="bit_perfect_mode_usb_android">DAC USB</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 mở DAC ở tần số và độ sâu bit của từng bản nhạc, không trộn và không lấy mẫu lại.</string>
+    <string name="bit_perfect_mode_usb_android">DAC USB (đường dẫn gốc Android)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Cần Android 14+ và điện thoại hỗ trợ USB bit-perfect. Android có thể không cung cấp chế độ này cho DAC đang kết nối.</string>
     <string name="bit_perfect_requires_android_14">Yêu cầu Android 14 trở lên</string>
     <string name="bit_perfect_mode_dap_exclusive">DAC tích hợp (AAudio độc quyền)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">Dành cho máy nghe nhạc có DAC riêng. Mở đầu ra tai nghe hoặc line độc quyền ở tần số của từng bản nhạc. Không phải thiết bị nào cũng cho phép chế độ độc quyền.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Dành cho đầu ra tai nghe có dây hoặc đường truyền tích hợp, không dành cho tai nghe USB. Android phải cấp chế độ độc quyền; nhiều điện thoại không cấp.</string>
     <string name="bit_perfect_requires_android_8_1">Yêu cầu Android 8.1 trở lên</string>
     <string name="bit_perfect_mode_usb_direct">DAC USB (trình điều khiển trực tiếp)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord tự điều khiển DAC trên mọi phiên bản Android và đặt âm lượng ngay trên DAC. Cần quyền USB. Có thể to hơn nhiều so với đầu ra thông thường.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">Tự động dùng âm lượng phần mềm. Chỉ dùng phần cứng khi đã kiểm tra bộ điều khiển DAC.</string>
     <string name="dac_volume">Âm lượng DAC</string>
     <string name="dac_volume_subtitle">Đặt trên chính DAC; nhạc không bị co giãn mức tín hiệu</string>
     <string name="usb_allow_fixed_volume">Cho phép DAC không có điều khiển âm lượng</string>
@@ -1367,8 +1367,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord không thể đặt âm lượng cho loại DAC này, nên nó phát ở mức tối đa và chỉ núm vặn của chính DAC, nếu có, mới điều chỉnh độ to. Âm thanh có thể to đến mức nguy hiểm với tai nghe nhạy.</string>
     <string name="convert_for_limited_dac">Chuyển đổi cho DAC cấu hình thấp</string>
     <string name="convert_for_limited_dac_subtitle">Chuyển đổi các bản nhạc vượt giới hạn của DAC sang định dạng cao nhất của nó. Bản nhạc có thể mất nhiều thời gian hơn để bắt đầu và sẽ không bit-perfect so với bản gốc.</string>
-    <string name="bit_perfect_confirm_title">Bật đầu ra bit-perfect?</string>
-    <string name="bit_perfect_confirm_message">DAC nhận nhạc ở mức tối đa và các nút âm lượng của điện thoại có thể ngừng hoạt động. Hãy giảm âm lượng DAC hoặc bộ khuếch đại trước khi phát.</string>
+    <string name="bit_perfect_confirm_title">Bật đầu ra độc quyền?</string>
+    <string name="bit_perfect_confirm_message">Tháo tai nghe trước lần phát đầu và kiểm tra âm lượng thực. USB trực tiếp bắt đầu với âm lượng phần mềm thấp. Chế độ khác có thể phụ thuộc âm lượng DAC.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-bit</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d-bit · mức tối đa của DAC, đã chuyển đổi từ định dạng của bản nhạc này</string>
     <string name="bit_perfect_status_inexact">%1$s · không chính xác: nguồn này không phải PCM lossless</string>
@@ -1383,4 +1383,22 @@
     <string name="diwali_title">BitChord chúc bạn một mùa Diwali vui vẻ</string>
     <string name="diwali_subtitle">Mong lễ hội ánh sáng này mang niềm vui đến ngôi nhà và âm nhạc đến mỗi ngày của bạn.</string>
     <string name="diwali_cta">Cùng ăn mừng</string>
+    <string name="usb_direct_volume_mode" formatted="false">Chế độ âm lượng USB trực tiếp</string>
+    <string name="usb_volume_auto" formatted="false">Tự động</string>
+    <string name="usb_volume_hardware" formatted="false">Âm lượng phần cứng</string>
+    <string name="usb_volume_software" formatted="false">Âm lượng phần mềm an toàn</string>
+    <string name="usb_volume_mode_description" formatted="false">Tự động dùng âm lượng phần mềm. Chỉ dùng phần cứng khi đã kiểm tra bộ điều khiển DAC.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">Phiên USB mới bắt đầu ở -40 dB hoặc thấp hơn; 0% là tắt tiếng. Phần trăm không phải giới hạn an toàn thính giác.</string>
+    <string name="usb_high_volume_title" formatted="false">Cho phép âm lượng USB cao hơn?</string>
+    <string name="usb_high_volume_warning" formatted="false">Trên -20 dB có thể rất lớn. Tháo tai nghe trước khi tăng âm lượng. Điều này cho phép mức cao hơn trong phiên USB này, không xác nhận độ lớn an toàn.</string>
+    <string name="usb_high_volume_allow" formatted="false">Tôi hiểu</string>
+    <string name="usb_hardware_volume_warning" formatted="false">Thông tin phần cứng có thể sai. Dùng phần mềm cho Bunny DSP hoặc thiết bị chưa xác minh. Tháo tai nghe trước khi thử phần cứng. Nếu lỗi, sẽ dùng phần mềm hoặc dừng phát.</string>
+    <string name="bit_perfect_status_software">%1$s · USB độc quyền · âm lượng phần mềm %2$s dB</string>
+    <string name="usb_direct_stopped">Đã dừng phát qua USB. Kiểm tra DAC và quyền USB hoặc chọn đầu ra khác trước khi phát lại.</string>
+    <string name="bit_perfect_unavailable_no_usb">Kết nối DAC USB. Nếu USB trực tiếp vừa nhả thiết bị, hãy đợi Android kết nối lại đường âm thanh.</string>
+    <string name="bit_perfect_unavailable_no_wired">Chế độ này cần đầu ra tai nghe có dây hoặc đường truyền tích hợp. Tai nghe USB dùng chế độ DAC USB.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android không cung cấp bộ trộn USB bit-perfect dùng được cho DAC này. Chỉ có Android 14 không bảo đảm hỗ trợ.</string>
+    <string name="bit_perfect_unavailable_permission">Cần quyền USB. Chọn USB trực tiếp và chấp thuận lời nhắc của hệ thống.</string>
+    <string name="bit_perfect_unavailable_format">Không có định dạng độc quyền tương thích cho bản nhạc này. Chọn đầu ra khác để tiếp tục.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android từ chối phát AAudio độc quyền thực sự trên đầu ra có dây.</string>
 </resources>

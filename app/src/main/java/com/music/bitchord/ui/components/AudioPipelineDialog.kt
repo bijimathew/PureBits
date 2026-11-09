@@ -64,8 +64,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.BitPerfectMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbSoftwareVolumePolicy
 import com.music.bitchord.playback.dsd.DsdFilter
 import com.music.bitchord.playback.dsd.DsdFormat
 import dev.chrisbanes.haze.HazeState
@@ -99,8 +101,8 @@ private val PIPELINE_ICON_TINT = Color.White.copy(alpha = 0.6f)
  *
  * Exactness here stops at the app: Android's mixer may still resample what
  * leaves it. The exclusive output ([bitPerfect], set under Settings → Bit-perfect
- * output) is the one path where it reaches the DAC unchanged, and every DSP
- * stage is bypassed there, so only the source itself can make it inexact.
+ * output) bypasses normal DSP. Final direct USB software attenuation is reported
+ * separately: exclusive ownership alone does not prove unchanged samples.
  */
 private fun bitExactVerdict(
     dsd: Boolean,
@@ -115,11 +117,12 @@ private fun bitExactVerdict(
     // here, so the PCM conversion is a deviation every DSD track carries,
     // whatever the stages after it do.
     dsd -> "No — DSD converted to PCM"
+    bitPerfect.active && bitPerfect.softwareVolumeDb?.let { it < 0.0 } == true ->
+        "No — USB software attenuation"
     bitPerfect.active && bitPerfect.dacLimited ->
         "No — ${bitPerfect.sourceBits}-bit / ${rateText(bitPerfect.sourceRateHz)} converted to " +
             "${bitPerfect.deviceName}'s max"
-    // Every DSP stage is bypassed on the exclusive output, so the only
-    // question left is whether the source itself was integer PCM.
+    // At unity software gain, the source/format conversion still determines exactness.
     bitPerfect.active && bitPerfect.exact -> "Yes — bit-perfect to ${bitPerfect.deviceName}"
     bitPerfect.active -> "No — source isn't lossless PCM"
     loudnessActive -> "No — loudness normalization"
@@ -152,6 +155,8 @@ fun AudioPipelineDialog(
     val nerdStats by NerdStats.current.collectAsStateWithLifecycle()
     val outputStatus by AudioOutputStatus.current.collectAsStateWithLifecycle()
     val bitPerfect by BitPerfectOutput.status.collectAsStateWithLifecycle()
+    val requestedOutput by AppSettings.bitPerfectMode.collectAsStateWithLifecycle()
+    val outputAvailability by BitPerfectOutput.availability.collectAsStateWithLifecycle()
 
     val eqEnabled by AppSettings.equalizerEnabled.collectAsStateWithLifecycle()
     val eqPreset by AppSettings.equalizerPreset.collectAsStateWithLifecycle()
@@ -321,7 +326,7 @@ fun AudioPipelineDialog(
             // step that actually changes the rate, so it is described
             // as what it is rather than as a resample, and its output
             // side is the PCM it produced, not the DSD rate.
-            val inRate = dsdRateHz ?: nerdStats?.sampleRateHz
+            val inRate = dsdRateHz ?: if (bitPerfect.active) bitPerfect.sourceRateHz else nerdStats?.sampleRateHz
             val outRate = when {
                 dsdRateHz != null -> DsdFormat.PCM_RATE
                 bitPerfect.active -> bitPerfect.sampleRateHz
@@ -368,16 +373,16 @@ fun AudioPipelineDialog(
             }
 
             // 4. DSP Stage
-            val pcmFormat = outputStatus.dspFormat
-            val dspRate = outputStatus.actualSampleRateHz ?: pcmRateHz
+            val pcmFormat = if (bitPerfect.active) "PCM${bitPerfect.outputBits} (normal DSP bypassed)" else outputStatus.dspFormat
+            val dspRate = if (bitPerfect.active) bitPerfect.sampleRateHz else outputStatus.actualSampleRateHz ?: pcmRateHz
             val dspRateText = dspRate?.let(::rateText) ?: "—"
-            val eqPresetText = if (eqEnabled) {
+            val eqPresetText = if (bitPerfect.active) "Bypassed" else if (eqEnabled) {
                 eqPreset.name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
             } else {
                 "Flat"
             }
-            val stereoExpandText = if (spatialAudio) "250%" else "100%"
-            val buffersText = outputStatus.bufferSize?.let { size ->
+            val stereoExpandText = if (bitPerfect.active) "Bypassed" else if (spatialAudio) "250%" else "100%"
+            val buffersText = if (bitPerfect.active) "Direct transport" else outputStatus.bufferSize?.let { size ->
                 val rate = outputStatus.actualSampleRateHz
                 val bytesPerSample = when (outputStatus.actualEncoding) {
                     AudioFormat.ENCODING_PCM_FLOAT, AudioFormat.ENCODING_PCM_32BIT -> 4
@@ -399,6 +404,7 @@ fun AudioPipelineDialog(
             // that is the order the samples meet them in — see
             // [DspChain] on why the level correction goes first.
             val loudnessGainText = when {
+                bitPerfect.active -> "Bypassed"
                 !loudnessNormalization -> stringResource(R.string.off)
                 outputStatus.loudnessGainDb == null -> "—"
                 else -> stringResource(
@@ -406,7 +412,7 @@ fun AudioPipelineDialog(
                     "%+.1f".format(Locale.ROOT, outputStatus.loudnessGainDb),
                 )
             }
-            val loudnessMeasuredText = outputStatus.loudnessLufs?.let {
+            val loudnessMeasuredText = if (bitPerfect.active) "Bypassed" else outputStatus.loudnessLufs?.let {
                 stringResource(R.string.loudness_lufs, "%+.1f".format(Locale.ROOT, it))
             } ?: "—"
 
@@ -426,7 +432,7 @@ fun AudioPipelineDialog(
                 PipelineRow(stringResource(R.string.pipeline_eq_preset), eqPresetText)
                 PipelineRow(stringResource(R.string.pipeline_stereo_expand), stereoExpandText)
                 PipelineRow(stringResource(R.string.pipeline_buffers), buffersText)
-                PipelineRow(stringResource(R.string.pipeline_output_api), outputStatus.sink.ifBlank { "AAudio" })
+                PipelineRow(stringResource(R.string.pipeline_output_api), if (bitPerfect.active) bitPerfect.driver.orEmpty() else outputStatus.sink.ifBlank { "AAudio" })
                 // The verdict, rather than the settings. Names whichever
                 // stage is altering samples — or, when none is, whether
                 // the route can carry the decoder's own encoding —
@@ -447,7 +453,8 @@ fun AudioPipelineDialog(
             }
 
             // 5. Output Device Stage
-            val deviceName = outputStatus.deviceName.ifBlank { "System default" }
+            val deviceName = if (bitPerfect.active) bitPerfect.deviceName.orEmpty()
+                else outputStatus.deviceName.ifBlank { "System default" }
             val audioTrackEncoding = when (outputStatus.actualEncoding) {
                 AudioFormat.ENCODING_PCM_FLOAT -> "Float32"
                 AudioFormat.ENCODING_PCM_24BIT_PACKED -> "PCM24"
@@ -474,8 +481,31 @@ fun AudioPipelineDialog(
                 onStageIconPositioned = onStageIconPositioned,
             ) {
                 PipelineRow(stringResource(R.string.pipeline_device_name), deviceName)
-                PipelineRow("Route", outputStatus.routeKind.name)
+                PipelineRow("Route", if (bitPerfect.active && bitPerfect.driver == "Direct USB") "USB" else outputStatus.routeKind.name)
                 PipelineRow("Transport", bitPerfect.driver.takeIf { bitPerfect.active } ?: outputStatus.transportType.label)
+                if (requestedOutput != BitPerfectMode.OFF && !bitPerfect.active) {
+                    val reason = bitPerfect.fallbackReason ?: outputAvailability[requestedOutput]
+                    PipelineRow("Exclusive output", reason?.let {
+                        bitPerfectReasonResource(requestedOutput, it)?.let { resource -> stringResource(resource) } ?: it
+                    } ?: stringResource(R.string.bit_perfect_status_waiting))
+                }
+                if (bitPerfect.active) {
+                    PipelineRow("Playback", "Exclusive")
+                    PipelineRow("Volume control", when (bitPerfect.volumeControl) {
+                        "software" -> "Software"
+                        "hardware" -> "Hardware"
+                        else -> "Endpoint / Android"
+                    })
+                    bitPerfect.softwareVolumeDb?.let { db ->
+                        PipelineRow("Software attenuation", when {
+                            db <= UsbSoftwareVolumePolicy.MUTE_DB -> "Muted (digital silence)"
+                            db == 0.0 -> "0 dB (unity gain)"
+                            else -> "%.1f dB".format(Locale.US, db)
+                        })
+                    }
+                    PipelineRow("Resampling", if (bitPerfect.sourceRateHz == bitPerfect.sampleRateHz) "None" else
+                        "${rateText(bitPerfect.sourceRateHz)} → ${rateText(bitPerfect.sampleRateHz)}")
+                }
 
                 val directStatusText = when {
                     bitPerfect.active ->
@@ -497,7 +527,7 @@ fun AudioPipelineDialog(
 
                 val mixerText = when {
                     bitPerfect.active ->
-                        if (bitPerfect.dacLimited) "Bypassed (DAC max)" else "Bypassed (bit-perfect)"
+                        "Bypassed (exclusive output)"
                     outputStatus.directPlaybackActual ->
                         "Direct path active; endpoint format not independently verified"
                     outputStatus.systemMixerRateHz != null -> {
@@ -534,7 +564,9 @@ fun AudioPipelineDialog(
                     }
                 }
 
-                if (outputStatus.fallbackReason != com.music.bitchord.playback.audio.FallbackReason.NONE) {
+                // Ordinary AudioTrack negotiation can retain a rejection while
+                // the separate exclusive transport is playing successfully.
+                if (!bitPerfect.active && outputStatus.fallbackReason != com.music.bitchord.playback.audio.FallbackReason.NONE) {
                     val fallbackText = outputStatus.fallbackDetail ?: outputStatus.fallbackReason.label
                     PipelineRow("Fallback", fallbackText)
                 }

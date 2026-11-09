@@ -27,7 +27,8 @@ import java.nio.ByteOrder
 import kotlin.math.abs
 
 /**
- * Writes decoded PCM to a [BitPerfectTransport] untouched.
+ * Writes decoded PCM to a [BitPerfectTransport]. Direct USB may apply final
+ * software volume after packing; other exclusive drivers retain their samples.
  *
  * Why not Media3's own sink with a custom `AudioOutputProvider`: that sink
  * converts every 24- and 32-bit stream to float before any output sees it,
@@ -38,9 +39,9 @@ import kotlin.math.abs
  * continuation while the format holds, a drain and reopen when it changes —
  * and nothing else.
  *
- * Volume, playback speed, silence skipping and audio effects are accepted and
- * ignored. Nothing upstream may scale a sample, and a speed other than 1x
- * would have to be resampled to be heard.
+ * Playback speed, silence skipping and normal audio effects are bypassed.
+ * Direct USB honors the independent DAC gain plus player mute/focus ducking;
+ * the resulting sample changes are reported separately from exclusive ownership.
  *
  * The one exception, only with [com.music.bitchord.data.settings.AppSettings.convertForLimitedDac]
  * on, is a track the DAC cannot take at all. [DacFormatConverter] then fits it
@@ -143,6 +144,8 @@ internal class BitPerfectAudioSink(
 
     /** A transport failure raised where Media3 allows no exception, rethrown at the next buffer. */
     private var pendingFailure: BitPerfectTransportException? = null
+    private var directUsbStream = false
+    private var playerVolume = 1f
 
     /** Whether this exact stream could be opened now; asks nothing of the device beyond a query. */
     fun canAccept(format: Format): Boolean {
@@ -157,6 +160,8 @@ internal class BitPerfectAudioSink(
 
     /** Whether normal output must wait for the DAC to come back to Android; see [BitPerfectOutput.normalOutputPending]. */
     fun holdsNormalOutput(): Boolean = outputs.normalOutputPending()
+    fun directUsbSelected(): Boolean = outputs.requiresDirectUsb()
+    fun requiresDirectUsb(): Boolean = directUsbStream || directUsbSelected()
 
     override fun setListener(listener: AudioSink.Listener) {
         this.listener = listener
@@ -169,6 +174,7 @@ internal class BitPerfectAudioSink(
         if (canAccept(format)) AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY else AudioSink.SINK_FORMAT_UNSUPPORTED
 
     override fun configure(audioSinkConfig: AudioSink.AudioSinkConfig) {
+        directUsbStream = directUsbSelected()
         val format = audioSinkConfig.format
         val mapping = audioSinkConfig.outputChannelMapping
         if (mapping != null && (0 until mapping.length()).any { mapping[it] != it }) {
@@ -200,8 +206,8 @@ internal class BitPerfectAudioSink(
                     "Bit-perfect output could not resume: ${error.message}",
                     AudioTrack.STATE_UNINITIALIZED,
                     input.format,
-                    /* isRecoverable = */ true,
-                    error,
+                    /* isRecoverable = */ !requiresDirectUsb(),
+                    if (requiresDirectUsb()) DirectUsbSafetyException("Direct USB resume failed", error) else error,
                 )
             }
         }
@@ -262,6 +268,7 @@ internal class BitPerfectAudioSink(
     }
 
     override fun playToEndOfStream() {
+        pendingFailure?.let { pendingFailure = null; throw writeException(it) }
         endOfStream = true
         releaseIfIdle()
         if (suspended) {
@@ -327,12 +334,21 @@ internal class BitPerfectAudioSink(
         return Util.sampleCountToDurationUs(active.bufferSizeFrames, active.sampleRate)
     }
 
-    // Accepted and ignored: each would have to alter the samples to take effect.
+    // Normal DSP is bypassed; direct USB volume is applied at the final write gate.
     override fun setPlaybackParameters(playbackParameters: PlaybackParameters) = Unit
     override fun getPlaybackParameters(): PlaybackParameters = PlaybackParameters.DEFAULT
     override fun setSkipSilenceEnabled(skipSilenceEnabled: Boolean) = Unit
     override fun getSkipSilenceEnabled(): Boolean = false
-    override fun setVolume(volume: Float) = Unit
+    override fun setVolume(volume: Float) {
+        playerVolume = volume
+        try {
+            transport?.setPlayerVolume(volume)
+            if (transport != null) publishStatus()
+        } catch (error: Exception) {
+            pendingFailure = error as? BitPerfectTransportException
+                ?: BitPerfectTransportException("USB player volume failed", error)
+        }
+    }
     override fun setAuxEffectInfo(auxEffectInfo: AuxEffectInfo) = Unit
     override fun setAudioSessionId(audioSessionId: Int) = Unit
 
@@ -347,7 +363,7 @@ internal class BitPerfectAudioSink(
 
     private fun open(input: Input) {
         val opened = try {
-            outputs.open(input.sampleRate, input.channelCount, input.sourceBits, this)
+            openTransport(input)
         } catch (error: BitPerfectTransportException) {
             outputs.markFailed(
                 input.sampleRate,
@@ -359,8 +375,8 @@ internal class BitPerfectAudioSink(
                 "Bit-perfect output unavailable: ${error.message}",
                 AudioTrack.STATE_UNINITIALIZED,
                 input.format,
-                /* isRecoverable = */ true,
-                error,
+                /* isRecoverable = */ !requiresDirectUsb(),
+                if (requiresDirectUsb()) DirectUsbSafetyException("Direct USB initialization failed", error) else error,
             )
         }
         transport = opened
@@ -437,7 +453,13 @@ internal class BitPerfectAudioSink(
     private fun suspend() {
         val active = transport ?: return
         val history = recent ?: return
-        val played = runCatching { active.playedFrames() }.getOrDefault(0L).coerceIn(0L, transportFrames)
+        val played = try {
+            active.playedFrames().coerceIn(0L, transportFrames)
+        } catch (error: BitPerfectTransportException) {
+            pendingFailure = error
+            closeTransport()
+            return
+        }
         val keptBytes = minOf((transportFrames - played) * outputFrameBytes, history.size.toLong()).toInt()
         // A tail not yet fully handed over to this device comes after what it holds.
         val unwritten = resumeTail
@@ -472,7 +494,7 @@ internal class BitPerfectAudioSink(
             return
         }
         val previous = requireNotNull(current)
-        val opened = outputs.open(previous.sampleRate, previous.channelCount, previous.sourceBits, this)
+        val opened = openTransport(previous)
         if (Wire(opened) != wire) {
             // A different DAC, or one now offering another format: the kept audio cannot go to it as it is.
             runCatching { opened.release() }
@@ -490,6 +512,19 @@ internal class BitPerfectAudioSink(
         publishStatus()
     }
 
+    /** Player mute is established before a single PCM frame is offered. */
+    private fun openTransport(input: Input): BitPerfectTransport {
+        val opened = outputs.open(input.sampleRate, input.channelCount, input.sourceBits, this)
+        try {
+            opened.setPlayerVolume(playerVolume)
+            return opened
+        } catch (error: Exception) {
+            runCatching { opened.release() }
+            outputs.release(this)
+            throw BitPerfectTransportException("volume_initialization", error)
+        }
+    }
+
     /** Gives the reopened device what [suspend] kept; true once all of it is in. */
     private fun writeResumeTail(): Boolean {
         val tail = resumeTail ?: return true
@@ -502,7 +537,15 @@ internal class BitPerfectAudioSink(
     }
 
     /** Stream frames played so far, on this device and the ones before it. */
-    private fun playedFrames(active: BitPerfectTransport): Long = framesBase + active.playedFrames()
+    private fun playedFrames(active: BitPerfectTransport): Long = try {
+        framesBase + active.playedFrames()
+    } catch (error: BitPerfectTransportException) {
+        // Clock polling may be the first sign of a fatal error after the last
+        // buffer. Surface it on the next renderer call that allows an error.
+        pendingFailure = error
+        listener?.onAudioSinkError(error)
+        framesBase
+    }
 
     /**
      * Plays out the stream the transport was opened for, so a new format can
@@ -540,13 +583,33 @@ internal class BitPerfectAudioSink(
         val active = transport ?: return
         val taken = handOver(active, output)
         if (taken > 0) writtenFrames += taken / outputFrameBytes
+        if (active.softwareVolumeDb != null) publishStatusIfGainChanged(active)
         startIfReady()
+    }
+
+    private var lastSamplesUnchanged: Boolean? = null
+
+    private fun publishStatusIfGainChanged(active: BitPerfectTransport) {
+        if (lastSamplesUnchanged != active.samplesUnchanged) publishStatus()
     }
 
     /** Writes what [active] takes of [buffer], keeping a copy in [recent] for a later [suspend]. */
     private fun handOver(active: BitPerfectTransport, buffer: ByteBuffer): Int {
         val start = buffer.position()
-        val taken = active.write(buffer)
+        // A transport may stage only 10 ms at a time for volume changes. A
+        // positive short write is progress, not backpressure: yielding after
+        // each one caps throughput at Media3's renderer polling cadence.
+        // Drain this bounded chunk now; only a zero write asks for a retry.
+        while (buffer.hasRemaining()) {
+            val before = buffer.position()
+            val remaining = buffer.remaining()
+            val count = active.write(buffer)
+            if (count !in 0..remaining || count % outputFrameBytes != 0 || buffer.position() != before + count) {
+                throw BitPerfectTransportException("Invalid exclusive output write count")
+            }
+            if (count == 0) break
+        }
+        val taken = buffer.position() - start
         if (taken > 0) {
             recent?.record(buffer, start, taken)
             transportFrames += taken / outputFrameBytes
@@ -597,6 +660,7 @@ internal class BitPerfectAudioSink(
 
     private fun publishStatus() {
         val active = transport ?: return
+        lastSamplesUnchanged = active.samplesUnchanged
         outputs.publish(
             BitPerfectOutput.Status(
                 active = true,
@@ -606,7 +670,12 @@ internal class BitPerfectAudioSink(
                 outputBits = if (converter != null) active.validBits else active.outputBits,
                 sourceBits = current?.sourceBits ?: 0,
                 sourceRateHz = current?.sampleRate ?: 0,
-                exact = exact && converter == null,
+                exact = exact && converter == null && active.samplesUnchanged,
+                sourceExact = exact && converter == null,
+                softwareVolumeDb = active.softwareAttenuationDb,
+                volumeControl = if (active.driver == BitPerfectDriver.USB_DIRECT) {
+                    if (active.softwareVolumeDb != null) "software" else "hardware"
+                } else null,
                 dacLimited = converter != null,
             ),
         )
@@ -636,8 +705,10 @@ internal class BitPerfectAudioSink(
         return AudioSink.WriteException(
             AudioTrack.ERROR_DEAD_OBJECT,
             current?.format ?: configured?.format ?: Format.Builder().build(),
-            /* isRecoverable = */ true,
-        )
+            /* isRecoverable = */ !requiresDirectUsb(),
+        ).apply {
+            if (requiresDirectUsb()) initCause(DirectUsbSafetyException("Direct USB write failed", error))
+        }
     }
 
     companion object {

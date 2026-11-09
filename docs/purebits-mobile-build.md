@@ -30,6 +30,9 @@ shared-module tasks must not include `:tv`, `:wearos`, or `bundleWearApk` tasks.
 
 ## Player and home changes
 
+Direct USB software volume implementation, verification and hardware checks are
+documented in [the USB investigation](usb-direct-software-volume.md).
+
 The large Top Picks shelf is removed from Home. Recents keeps its compact layout
 and now starts below the header (or the sign-in banner when signed out).
 

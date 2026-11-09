@@ -147,6 +147,7 @@ import com.music.bitchord.ui.components.PillSegmentedControl
 import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.components.languageDisplayNameRes
 import com.music.bitchord.ui.components.MessageState
+import com.music.bitchord.ui.components.bitPerfectReasonResource
 import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.performance.resolvePerformanceRefreshRate
@@ -159,8 +160,11 @@ import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.data.settings.BitPerfectMode
+import com.music.bitchord.data.settings.UsbDirectVolumeMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
+import com.music.bitchord.playback.audio.bitperfect.DacVolume
+import com.music.bitchord.playback.audio.bitperfect.usb.UsbSoftwareVolumePolicy
 import com.music.bitchord.data.settings.AutomixPerformanceMode
 import com.music.bitchord.R
 import com.music.bitchord.data.sources.DeviceCodecs
@@ -265,9 +269,11 @@ fun SettingsScreen(
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
     val bitPerfectMode by AppSettings.bitPerfectMode.collectAsStateWithLifecycle()
     val bitPerfectStatus by BitPerfectOutput.status.collectAsStateWithLifecycle()
+    val bitPerfectAvailability by BitPerfectOutput.availability.collectAsStateWithLifecycle()
     val bitPerfectReady by BitPerfectOutput.ready.collectAsStateWithLifecycle()
     val dacVolume by BitPerfectOutput.hardwareVolume.collectAsStateWithLifecycle()
-    val usbAllowFixedVolume by AppSettings.usbAllowFixedVolume.collectAsStateWithLifecycle()
+    val usbDirectVolumeMode by AppSettings.usbDirectVolumeMode.collectAsStateWithLifecycle()
+    val softwareVolumeDb by BitPerfectOutput.softwareVolume.collectAsStateWithLifecycle()
     val convertForLimitedDac by AppSettings.convertForLimitedDac.collectAsStateWithLifecycle()
     val loudnessNormalization by AppSettings.loudnessNormalization.collectAsStateWithLifecycle()
     val loudnessOffOnSpeaker by AppSettings.loudnessOffOnSpeaker.collectAsStateWithLifecycle()
@@ -688,7 +694,7 @@ fun SettingsScreen(
                     subtitleContent = {
                         Column {
                             Text(
-                                text = bitPerfectSubtitle(bitPerfectMode, bitPerfectStatus),
+                                text = bitPerfectSubtitle(bitPerfectMode, bitPerfectStatus, bitPerfectAvailability[bitPerfectMode]),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -704,9 +710,7 @@ fun SettingsScreen(
                     onClick = { onOpenChoice(SettingsChoiceKind.BIT_PERFECT) },
                 )
             }
-            // The DAC's own attenuator: the only volume direct USB has, since
-            // nothing upstream may scale a sample. It and the row after it
-            // belong to Bit-perfect output, so neither is divided from it.
+            // Both direct USB modes use the same player/HUD/key control.
             dacVolume?.let { volume ->
                 val dacVolumeTitle = stringResource(R.string.dac_volume)
                 row(dacVolumeTitle, "volume", "usb", "dac", divided = false) {
@@ -723,16 +727,29 @@ fun SettingsScreen(
                 }
             }
             if (bitPerfectMode == BitPerfectMode.USB_DIRECT) {
-                val fixedVolumeTitle = stringResource(R.string.usb_allow_fixed_volume)
-                row(fixedVolumeTitle, "volume", "usb", "dac", divided = false) {
-                    SettingsSubRow(
-                        title = fixedVolumeTitle,
-                        subtitle = stringResource(R.string.usb_allow_fixed_volume_subtitle),
-                        checked = usbAllowFixedVolume,
-                        onCheckedChange = { on ->
-                            if (on) onConfirmFixedVolume() else AppSettings.setUsbAllowFixedVolume(false)
-                        },
+                val volumeModeTitle = stringResource(R.string.usb_direct_volume_mode)
+                row(volumeModeTitle, "volume", "usb", "dac", "software", divided = false) {
+                    SettingsRow(
+                        icon = SfIcons.VolumeUp,
+                        title = volumeModeTitle,
+                        subtitle = usbDirectVolumeMode.localizedLabel(),
+                        onClick = { onOpenChoice(SettingsChoiceKind.USB_VOLUME) },
                     )
+                }
+                softwareVolumeDb?.let { db ->
+                    val softwareTitle = stringResource(R.string.usb_volume_software)
+                    row(softwareTitle, "volume", "usb", "software", divided = false) {
+                        SliderRow(
+                            icon = SfIcons.VolumeUp,
+                            title = softwareTitle,
+                            subtitle = stringResource(R.string.usb_software_volume_subtitle),
+                            value = if (db <= UsbSoftwareVolumePolicy.MUTE_DB) "−∞ dB" else "%.1f dB".format(db),
+                            sliderValue = UsbSoftwareVolumePolicy.dbToFraction(db).toFloat(),
+                            onSliderValue = DacVolume::set,
+                            valueRange = 0f..1f,
+                            steps = 0,
+                        )
+                    }
                 }
             }
             if (bitPerfectMode != BitPerfectMode.OFF && bitPerfectMode.isSupported) {
@@ -2265,6 +2282,15 @@ private fun BypassedByBitPerfect(bypassed: Boolean, content: @Composable () -> U
 }
 
 @Composable
+private fun UsbDirectVolumeMode.localizedLabel(): String = stringResource(
+    when (this) {
+        UsbDirectVolumeMode.AUTO -> R.string.usb_volume_auto
+        UsbDirectVolumeMode.HARDWARE -> R.string.usb_volume_hardware
+        UsbDirectVolumeMode.SOFTWARE -> R.string.usb_volume_software
+    },
+)
+
+@Composable
 private fun BitPerfectMode.localizedLabel(): String = stringResource(
     when (this) {
         BitPerfectMode.OFF -> R.string.off
@@ -2300,8 +2326,13 @@ private fun BitPerfectMode.description(): String = stringResource(
  * a mode can be on while the playing track still goes through the mixer.
  */
 @Composable
-private fun bitPerfectSubtitle(mode: BitPerfectMode, status: BitPerfectOutput.Status): String = when {
+private fun bitPerfectSubtitle(mode: BitPerfectMode, status: BitPerfectOutput.Status, unavailableReason: String?): String = when {
     mode == BitPerfectMode.OFF || !mode.isSupported -> mode.description()
+    status.active && status.softwareVolumeDb != null -> stringResource(
+        R.string.bit_perfect_status_software,
+        status.deviceName.orEmpty(),
+        if (status.softwareVolumeDb <= UsbSoftwareVolumePolicy.MUTE_DB) "−∞" else "%.1f".format(status.softwareVolumeDb),
+    )
     status.active && status.dacLimited -> stringResource(
         R.string.bit_perfect_status_dac_limited,
         status.deviceName.orEmpty(),
@@ -2318,9 +2349,17 @@ private fun bitPerfectSubtitle(mode: BitPerfectMode, status: BitPerfectOutput.St
         "%.1f".format(status.sampleRateHz / 1000.0),
         status.outputBits,
     )
-    status.fallbackReason != null -> stringResource(R.string.bit_perfect_status_unavailable, status.fallbackReason)
+    status.fallbackReason != null -> stringResource(
+        R.string.bit_perfect_status_unavailable,
+        bitPerfectReasonText(mode, status.fallbackReason),
+    )
+    unavailableReason != null -> bitPerfectReasonText(mode, unavailableReason)
     else -> stringResource(R.string.bit_perfect_status_waiting)
 }
+
+@Composable
+private fun bitPerfectReasonText(mode: BitPerfectMode, reason: String): String =
+    bitPerfectReasonResource(mode, reason)?.let { stringResource(it) } ?: reason
 
 // ---- Building blocks --------------------------------------------------------
 
@@ -2833,6 +2872,7 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
     DOWNLOAD_QUALITY(R.string.download_quality),
     AUTOMIX_PERFORMANCE(R.string.automix_performance),
     BIT_PERFECT(R.string.bit_perfect_output),
+    USB_VOLUME(R.string.usb_direct_volume_mode),
     FONT(R.string.font),
 }
 
@@ -2866,6 +2906,24 @@ fun SettingsChoicePage(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
+    var confirmHardwareVolume by remember { mutableStateOf(false) }
+    if (confirmHardwareVolume) {
+        AlertDialog(
+            onDismissRequest = { confirmHardwareVolume = false },
+            title = { Text(stringResource(R.string.usb_volume_hardware)) },
+            text = { Text(stringResource(R.string.usb_hardware_volume_warning)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmHardwareVolume = false
+                    AppSettings.setUsbDirectVolumeMode(UsbDirectVolumeMode.HARDWARE)
+                    onChosen()
+                }) { Text(stringResource(R.string.usb_high_volume_allow)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmHardwareVolume = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -2938,18 +2996,38 @@ fun SettingsChoicePage(
 
             SettingsChoiceKind.BIT_PERFECT -> {
                 val selected by AppSettings.bitPerfectMode.collectAsStateWithLifecycle()
+                val availability by BitPerfectOutput.availability.collectAsStateWithLifecycle()
                 ChoiceGroup(
                     options = BitPerfectMode.entries,
                     selected = selected,
                     label = { it.localizedLabel() },
-                    detail = { it.description() },
+                    detail = { mode ->
+                        val description = mode.description()
+                        val reason = availability[mode]?.let { bitPerfectReasonText(mode, it) }
+                        if (reason == null || reason == description) description else "$description\n$reason"
+                    },
                     footer = stringResource(R.string.bit_perfect_sheet_warning),
                     enabled = { it.isSupported },
                 ) { mode ->
                     onChosen()
-                    // Leaving the mode needs no warning; entering it hands
-                    // volume to the DAC, at full scale.
+                    // Mode selection is explicit; capability failures never choose a louder route.
                     if (mode == BitPerfectMode.OFF) AppSettings.setBitPerfectMode(mode) else onConfirmBitPerfect(mode)
+                }
+            }
+
+            SettingsChoiceKind.USB_VOLUME -> {
+                val selected by AppSettings.usbDirectVolumeMode.collectAsStateWithLifecycle()
+                ChoiceGroup(
+                    options = UsbDirectVolumeMode.entries,
+                    selected = selected,
+                    label = { it.localizedLabel() },
+                    footer = stringResource(R.string.usb_volume_mode_description),
+                ) { mode ->
+                    if (mode == UsbDirectVolumeMode.HARDWARE) confirmHardwareVolume = true
+                    else {
+                        AppSettings.setUsbDirectVolumeMode(mode)
+                        onChosen()
+                    }
                 }
             }
 

@@ -1404,16 +1404,16 @@
     <string name="font_footer">Clásica recupera la tipografía más gruesa y compacta que usaba la app antes de adaptarla a Apple Music.</string>
     <string name="bit_perfect_output">Salida bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">La salida bit-perfect está lista, por lo que se omiten los ajustes atenuados y no se solicitan versiones Dolby Atmos. Vuelven a funcionar al desconectar el DAC o desactivar el modo.</string>
-    <string name="bit_perfect_sheet_warning">Envía la pista al DAC sin cambios. Se omiten el ecualizador, la normalización de volumen, el fundido cruzado, la mezcla automática, la velocidad de reproducción y el volumen de BitChord.</string>
+    <string name="bit_perfect_sheet_warning">La salida exclusiva omite efectos, normalización, fundido y velocidad. USB directo admite volumen por software; las muestras escaladas no son bit-perfect.</string>
     <string name="bit_perfect_mode_off_subtitle">El audio pasa por el mezclador de Android y los efectos de BitChord.</string>
-    <string name="bit_perfect_mode_usb_android">DAC USB</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 abre el DAC con la frecuencia y la profundidad de bits de cada pista, sin mezclar ni remuestrear.</string>
+    <string name="bit_perfect_mode_usb_android">DAC USB (ruta nativa de Android)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Requiere Android 14 o posterior y compatibilidad USB bit-perfect del teléfono. Android puede no ofrecer este modo para el DAC conectado.</string>
     <string name="bit_perfect_requires_android_14">Requiere Android 14 o posterior</string>
     <string name="bit_perfect_mode_dap_exclusive">DAC integrado (AAudio exclusivo)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">Para reproductores de música con DAC propio. Abre la salida de auriculares o de línea en exclusiva con la frecuencia de cada pista. No todos los dispositivos conceden el modo exclusivo.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Para una salida de auriculares o línea integrada con cable, no auriculares USB. Android debe conceder el modo exclusivo; muchos teléfonos no lo hacen.</string>
     <string name="bit_perfect_requires_android_8_1">Requiere Android 8.1 o posterior</string>
     <string name="bit_perfect_mode_usb_direct">DAC USB (controlador directo)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord controla el DAC directamente, en cualquier versión de Android, y ajusta el volumen en el DAC. Pide permiso USB. Puede sonar mucho más alto que la salida normal.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">Automático usa volumen por software. Use hardware solo si ha verificado sus controles.</string>
     <string name="dac_volume">Volumen del DAC</string>
     <string name="dac_volume_subtitle">Se ajusta en el propio DAC; la música no se escala</string>
     <string name="usb_allow_fixed_volume">Permitir DAC sin control de volumen</string>
@@ -1422,8 +1422,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord no puede ajustar el volumen de este tipo de DAC, así que reproduce a escala completa y solo su propio mando, si lo tiene, controla el nivel. Puede sonar peligrosamente alto con auriculares sensibles.</string>
     <string name="convert_for_limited_dac">Convertir para DAC más limitados</string>
     <string name="convert_for_limited_dac_subtitle">Convierte las pistas que superan el límite de tu DAC a su formato más alto. Pueden tardar más en empezar y no serán bit-perfect respecto al original.</string>
-    <string name="bit_perfect_confirm_title">¿Activar la salida bit-perfect?</string>
-    <string name="bit_perfect_confirm_message">El DAC recibe la música a escala completa y es posible que los botones de volumen del teléfono dejen de funcionar. Baja el volumen del DAC o del amplificador antes de reproducir.</string>
+    <string name="bit_perfect_confirm_title">¿Activar salida exclusiva?</string>
+    <string name="bit_perfect_confirm_message">Quítese los auriculares antes de la primera reproducción y compruebe el nivel real. USB directo empieza con volumen conservador por software. Otros modos pueden depender del volumen del DAC.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d bits</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d bits · máximo del DAC, convertido desde el formato de esta pista</string>
     <string name="bit_perfect_status_inexact">%1$s · no exacto: esta fuente no es PCM sin pérdida</string>
@@ -1438,4 +1438,22 @@
     <string name="diwali_title">BitChord te desea un feliz Diwali</string>
     <string name="diwali_subtitle">Que este festival de las luces llene tu hogar de alegría y tus días de música.</string>
     <string name="diwali_cta">Celebremos</string>
+    <string name="usb_direct_volume_mode" formatted="false">Modo de volumen USB directo</string>
+    <string name="usb_volume_auto" formatted="false">Automático</string>
+    <string name="usb_volume_hardware" formatted="false">Volumen por hardware</string>
+    <string name="usb_volume_software" formatted="false">Volumen seguro por software</string>
+    <string name="usb_volume_mode_description" formatted="false">Automático usa volumen por software. Use hardware solo si ha verificado sus controles.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">Las nuevas sesiones USB empiezan a -40 dB o menos; 0% silencia. El porcentaje no indica un límite seguro para el oído.</string>
+    <string name="usb_high_volume_title" formatted="false">¿Permitir mayor volumen USB?</string>
+    <string name="usb_high_volume_warning" formatted="false">Por encima de -20 dB el sonido puede ser muy fuerte. Quítese los auriculares antes de subirlo. Esto permite niveles mayores en esta sesión USB; no garantiza un volumen seguro.</string>
+    <string name="usb_high_volume_allow" formatted="false">Entendido</string>
+    <string name="usb_hardware_volume_warning" formatted="false">Los datos del hardware pueden ser incorrectos. Use software con Bunny DSP o dispositivos dudosos. Quítese los auriculares antes de probar el hardware. Si falla, se usa software o se detiene la reproducción.</string>
+    <string name="bit_perfect_status_software">%1$s · USB exclusivo · volumen por software %2$s dB</string>
+    <string name="usb_direct_stopped">La reproducción USB se ha detenido. Compruebe el DAC y el permiso USB, o elija otra salida antes de volver a reproducir.</string>
+    <string name="bit_perfect_unavailable_no_usb">Conecte un DAC USB. Si USB directo acaba de liberarlo, espere a que Android restablezca la ruta de audio.</string>
+    <string name="bit_perfect_unavailable_no_wired">Este modo requiere una salida de auriculares o línea integrada con cable. Los auriculares USB usan un modo DAC USB.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android no ofrece un mezclador USB bit-perfect utilizable para este DAC. Android 14 por sí solo no garantiza compatibilidad.</string>
+    <string name="bit_perfect_unavailable_permission">Se necesita permiso USB. Seleccione USB directo y acepte la solicitud del sistema.</string>
+    <string name="bit_perfect_unavailable_format">No hay un formato exclusivo compatible para esta pista. Elija otra salida para continuar.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android rechazó la reproducción AAudio realmente exclusiva en la salida con cable.</string>
 </resources>

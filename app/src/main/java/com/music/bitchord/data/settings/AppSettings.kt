@@ -65,8 +65,8 @@ enum class OutputPcmMode(val label: String) {
  * can change freely.
  *
  * Bit-perfect output bypasses the equalizer, loudness normalization,
- * crossfade, Automix, playback speed and software volume: any of them would
- * change the samples. Volume belongs to the DAC.
+ * crossfade, Automix and playback speed. Direct USB can apply its own final
+ * software attenuation, in which case playback is exclusive but not bit-perfect.
  *
  * See [com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput].
  */
@@ -75,7 +75,7 @@ enum class BitPerfectMode {
 
     /**
      * BitChord's own USB Audio Class driver on libusb: any Android version,
-     * volume set on the DAC itself. Requires USB permission.
+     * with independent software or hardware volume. Requires USB permission.
      */
     USB_DIRECT,
 
@@ -84,6 +84,13 @@ enum class BitPerfectMode {
 
     /** Android 14's bit-perfect mixer for a USB DAC. */
     USB_ANDROID,
+}
+
+/** AUTO deliberately chooses software: a successful USB read-back cannot prove audible gain. */
+enum class UsbDirectVolumeMode {
+    AUTO,
+    HARDWARE,
+    SOFTWARE,
 }
 
 /**
@@ -287,6 +294,9 @@ object AppSettings {
 
     /** Unprocessed output to a DAC; see [BitPerfectMode]. */
     val bitPerfectMode = MutableStateFlow(BitPerfectMode.OFF)
+
+    /** Software by default, including existing installations with the old fixed-volume opt-in. */
+    val usbDirectVolumeMode = MutableStateFlow(UsbDirectVolumeMode.AUTO)
 
     /**
      * Lets direct USB play to a DAC with no volume control BitChord can set:
@@ -990,6 +1000,9 @@ object AppSettings {
         bitPerfectMode.value = runCatching {
             BitPerfectMode.valueOf(prefs.getString(KEY_BIT_PERFECT_MODE, null) ?: BitPerfectMode.OFF.name)
         }.getOrDefault(BitPerfectMode.OFF)
+        usbDirectVolumeMode.value = runCatching {
+            UsbDirectVolumeMode.valueOf(prefs.getString(KEY_USB_DIRECT_VOLUME_MODE, null) ?: UsbDirectVolumeMode.AUTO.name)
+        }.getOrDefault(UsbDirectVolumeMode.AUTO)
         usbAllowFixedVolume.value = prefs.getBoolean(KEY_USB_ALLOW_FIXED_VOLUME, false)
         convertForLimitedDac.value = prefs.getBoolean(KEY_CONVERT_FOR_LIMITED_DAC, false)
         loudnessNormalization.value = prefs.getBoolean(KEY_LOUDNESS_NORMALIZATION, true)
@@ -1812,6 +1825,11 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_USB_ALLOW_FIXED_VOLUME, value).apply()
     }
 
+    fun setUsbDirectVolumeMode(value: UsbDirectVolumeMode) {
+        usbDirectVolumeMode.value = value
+        prefs.edit().putString(KEY_USB_DIRECT_VOLUME_MODE, value.name).apply()
+    }
+
     fun setConvertForLimitedDac(value: Boolean) {
         convertForLimitedDac.value = value
         prefs.edit().putBoolean(KEY_CONVERT_FOR_LIMITED_DAC, value).apply()
@@ -2263,6 +2281,7 @@ object AppSettings {
     private const val KEY_PREFER_USB_DAC = "prefer_usb_dac"
     private const val KEY_BIT_PERFECT_MODE = "bit_perfect_mode"
     private const val KEY_USB_ALLOW_FIXED_VOLUME = "usb_allow_fixed_volume"
+    private const val KEY_USB_DIRECT_VOLUME_MODE = "usb_direct_volume_mode"
     private const val KEY_CONVERT_FOR_LIMITED_DAC = "convert_for_limited_dac"
     private const val KEY_LOUDNESS_NORMALIZATION = "loudness_normalization"
     private const val KEY_LOUDNESS_OFF_ON_SPEAKER = "loudness_off_on_speaker"

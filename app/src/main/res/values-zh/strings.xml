@@ -1409,16 +1409,16 @@
     <string name="font_footer">旧版会恢复应用在匹配 Apple Music 之前使用的更粗、更紧凑的字体。</string>
     <string name="bit_perfect_output">比特完美输出</string>
     <string name="bit_perfect_bypassed_footer">比特完美输出已就绪，因此变灰的设置会被绕过，也不会请求 Dolby Atmos 版本。断开 DAC 或关闭此模式后，它们会恢复工作。</string>
-    <string name="bit_perfect_sheet_warning">将曲目原样发送到 DAC。均衡器、响度标准化、交叉淡入淡出、Automix、播放速度和 BitChord 的音量都会被绕过。</string>
+    <string name="bit_perfect_sheet_warning">独占输出绕过音效、响度均衡、交叉淡化和播放速度。USB 直连可以使用软件音量；经过缩放的采样并非位完美。</string>
     <string name="bit_perfect_mode_off_subtitle">音频经过 Android 的混音器和 BitChord 的音效。</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 按每首曲目自身的采样率和位深打开 DAC，不进行混音或重采样。</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC（Android 原生路径）</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">需要 Android 14 及以上和手机的位完美 USB 支持。Android 可能不会为已连接的 DAC 提供此模式。</string>
     <string name="bit_perfect_requires_android_14">需要 Android 14 或更高版本</string>
     <string name="bit_perfect_mode_dap_exclusive">内置 DAC（AAudio 独占）</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">适用于自带 DAC 的音乐播放器。按每首曲目自身的采样率独占打开耳机或线路输出。并非所有设备都允许独占模式。</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">用于内置 DAC 的有线耳机或线路输出，不适用于 USB 耳机。Android 必须授予独占模式，许多手机并不支持。</string>
     <string name="bit_perfect_requires_android_8_1">需要 Android 8.1 或更高版本</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC（直接驱动）</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord 可在任何 Android 版本上直接驱动 DAC，并在 DAC 上设置音量。需要 USB 权限。声音可能比普通输出大得多。</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">自动模式使用软件音量。仅对已验证音量控制的 DAC 使用硬件模式。</string>
     <string name="dac_volume">DAC 音量</string>
     <string name="dac_volume_subtitle">在 DAC 本身上设置；音乐数据不会被缩放</string>
     <string name="usb_allow_fixed_volume">允许无音量控制的 DAC</string>
@@ -1427,8 +1427,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord 无法设置此类 DAC 的音量，因此它会以满刻度播放，只有 DAC 自身的旋钮（如果有）才能控制响度。使用灵敏的耳机时，声音可能大到危险。</string>
     <string name="convert_for_limited_dac">为低规格 DAC 转换</string>
     <string name="convert_for_limited_dac_subtitle">将超出 DAC 上限的曲目转换为其支持的最高格式。曲目可能需要更长时间才能开始播放，且相对原始音频不再是比特完美。</string>
-    <string name="bit_perfect_confirm_title">开启比特完美输出？</string>
-    <string name="bit_perfect_confirm_message">DAC 将以满刻度接收音乐，手机的音量键可能会失效。播放前请先调低 DAC 或放大器的音量。</string>
+    <string name="bit_perfect_confirm_title">启用独占输出？</string>
+    <string name="bit_perfect_confirm_message">首次播放前请摘下耳机并确认实际音量。USB 直连以较低的软件音量开始。其他独占模式可能依赖 DAC 音量。</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d 位</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d 位 · DAC 上限，由此曲目的格式转换而来</string>
     <string name="bit_perfect_status_inexact">%1$s · 不精确：此音源不是无损 PCM</string>
@@ -1443,4 +1443,22 @@
     <string name="diwali_title">BitChord 祝你排灯节快乐</string>
     <string name="diwali_subtitle">愿这个灯火节日为你的家带来喜悦，为每天带来音乐。</string>
     <string name="diwali_cta">一起庆祝</string>
+    <string name="usb_direct_volume_mode" formatted="false">USB 直连音量模式</string>
+    <string name="usb_volume_auto" formatted="false">自动</string>
+    <string name="usb_volume_hardware" formatted="false">硬件音量</string>
+    <string name="usb_volume_software" formatted="false">安全软件音量</string>
+    <string name="usb_volume_mode_description" formatted="false">自动模式使用软件音量。仅对已验证音量控制的 DAC 使用硬件模式。</string>
+    <string name="usb_software_volume_subtitle" formatted="false">新的 USB 会话从 -40 dB 或更低开始；0% 为静音。百分比并非听力安全界限。</string>
+    <string name="usb_high_volume_title" formatted="false">允许提高 USB 音量？</string>
+    <string name="usb_high_volume_warning" formatted="false">高于 -20 dB 时声音可能非常大。提高音量前请摘下耳机。这将允许在本次 USB 会话中使用更高音量，并不代表该音量安全。</string>
+    <string name="usb_high_volume_allow" formatted="false">我已了解</string>
+    <string name="usb_hardware_volume_warning" formatted="false">硬件报告可能不准确。Bunny DSP 或未经验证的设备请使用软件音量。测试硬件控制前请摘下耳机。控制失败时使用软件音量或停止播放。</string>
+    <string name="bit_perfect_status_software">%1$s · 独占 USB · 软件音量 %2$s dB</string>
+    <string name="usb_direct_stopped">USB 播放已停止。请检查 DAC 和 USB 权限，或选择其他输出后再播放。</string>
+    <string name="bit_perfect_unavailable_no_usb">请连接 USB DAC。如果 USB 直连刚释放设备，请等待 Android 重新连接音频路径。</string>
+    <string name="bit_perfect_unavailable_no_wired">此模式需要内置 DAC 的有线耳机或线路输出。USB 耳机请使用 USB DAC 模式。</string>
+    <string name="bit_perfect_unavailable_native_usb">Android 未为此 DAC 提供可用的位完美 USB 混音器。仅有 Android 14 并不保证支持。</string>
+    <string name="bit_perfect_unavailable_permission">需要 USB 权限。请选择 USB 直连并批准系统提示。</string>
+    <string name="bit_perfect_unavailable_format">此曲目没有兼容的独占格式。请选择其他输出以继续播放。</string>
+    <string name="bit_perfect_unavailable_exclusive">Android 拒绝在有线输出上使用真正的 AAudio 独占播放。</string>
 </resources>

@@ -6,6 +6,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.audio.AudioSink
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -25,6 +26,7 @@ class BitPerfectAudioSinkTest {
         override val outputBits: Int,
         private val capacityFrames: Int = 8192,
         override val driver: BitPerfectDriver = BitPerfectDriver.ANDROID_MIXER,
+        private val maxWriteFrames: Int = Int.MAX_VALUE,
     ) : BitPerfectTransport {
         override val deviceName = "Fake DAC"
         override val bufferSizeFrames = capacityFrames.toLong()
@@ -36,21 +38,42 @@ class BitPerfectAudioSinkTest {
         var stopped = false
         var released = false
         var failOnWrite = false
+        var failOnClock = false
+        var writeCalls = 0
+            private set
+        val writtenAtPlay = mutableListOf<Long>()
+        var softwareDb: Double? = null
+        var playerMultiplier = 1f
+            private set
+        val playerVolumeChanges = mutableListOf<Float>()
+        val playerVolumeAtWrite = mutableListOf<Float>()
+        override val softwareVolumeDb: Double? get() = softwareDb
+        override val samplesUnchanged: Boolean get() = (softwareDb == null || softwareDb == 0.0) && playerMultiplier == 1f
+
+        override fun setPlayerVolume(volume: Float) {
+            playerMultiplier = volume
+            playerVolumeChanges += volume
+        }
 
         override fun write(buffer: ByteBuffer): Int {
+            writeCalls++
             if (failOnWrite) throw BitPerfectTransportException("route_changed")
-            val room = ((capacityFrames - (written - played)) * frameBytes).toInt()
-            val count = minOf(room, buffer.remaining()) / frameBytes * frameBytes
+            playerVolumeAtWrite += playerMultiplier
+            val roomFrames = (capacityFrames - (written - played)).toInt()
+            val count = minOf(roomFrames, buffer.remaining() / frameBytes, maxWriteFrames) * frameBytes
             repeat(count) { bytes.write(buffer.get().toInt()) }
             written += count / frameBytes
             return count
         }
 
-        override fun play() { playing = true }
+        override fun play() { playing = true; writtenAtPlay += written }
         override fun pause() { playing = false }
         override fun flush() { written = 0; played = 0; bytes.reset() }
         override fun stop() { stopped = true }
-        override fun playedFrames() = played
+        override fun playedFrames(): Long {
+            if (failOnClock) throw BitPerfectTransportException("USB transfer clock lost")
+            return played
+        }
         override fun release() { released = true }
 
         fun advance(frames: Long) {
@@ -69,13 +92,23 @@ class BitPerfectAudioSinkTest {
         var dacRate: Int? = null
         var dacBits: Int? = null
         var driver = BitPerfectDriver.ANDROID_MIXER
+        var directRequired = false
+        var softwareDb: Double? = null
         var releases = 0
+        var capacityFrames = 8192
+        var maxWriteFrames = Int.MAX_VALUE
+
+        override fun requiresDirectUsb() = directRequired
 
         override fun canOpen(sampleRate: Int, channels: Int, sourceBits: Int, requester: Any) = available
 
         override fun open(sampleRate: Int, channels: Int, sourceBits: Int, requester: Any): BitPerfectTransport {
             if (failOpen) throw BitPerfectTransportException("unsupported")
-            return FakeTransport(dacRate ?: sampleRate, channels, dacBits ?: maxOf(sourceBits, 24), driver = driver)
+            return FakeTransport(
+                dacRate ?: sampleRate, channels, dacBits ?: maxOf(sourceBits, 24),
+                capacityFrames = capacityFrames, driver = driver, maxWriteFrames = maxWriteFrames,
+            )
+                .also { it.softwareDb = softwareDb }
                 .also(opened::add)
         }
 
@@ -209,6 +242,135 @@ class BitPerfectAudioSinkTest {
         assertFalse(big.hasRemaining())
     }
 
+    @Test(timeout = 1000)
+    fun directUsbTenMillisecondWritesFillAvailableBufferInOneRendererCall() {
+        val outputs = FakeOutputs().apply {
+            driver = BitPerfectDriver.USB_DIRECT
+            softwareDb = -40.0
+            dacBits = 16
+            maxWriteFrames = 441
+        }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.configure(config(format(rate = 44100)))
+        sink.play()
+        val source = pcm16(4096)
+        val expected = bytes(source)
+
+        assertTrue("small successful writes must not yield back to the renderer", sink.handleBuffer(source, 0, 1))
+        val transport = outputs.opened.single()
+        assertEquals(4096L, transport.written)
+        assertEquals(listOf(4096L), transport.writtenAtPlay)
+        assertTrue(transport.writeCalls in 2..11)
+        assertFalse(source.hasRemaining())
+        assertArrayEquals(expected, transport.bytes.toByteArray())
+    }
+
+    @Test(timeout = 1000)
+    fun directUsbNinetySixKhzPacked24BitChunkAlsoFillsBeforeStarting() {
+        val outputs = FakeOutputs().apply {
+            driver = BitPerfectDriver.USB_DIRECT
+            softwareDb = -40.0
+            dacBits = 24
+            maxWriteFrames = 960
+        }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.configure(config(format(rate = 96000, encoding = C.ENCODING_PCM_24BIT)))
+        sink.play()
+        val source = pcm24(4096)
+        val expected = bytes(source)
+
+        assertTrue(sink.handleBuffer(source, 0, 1))
+        val transport = outputs.opened.single()
+        assertEquals(4096L, transport.written)
+        assertEquals(listOf(4096L), transport.writtenAtPlay)
+        assertTrue(transport.writeCalls in 2..6)
+        assertArrayEquals(expected, transport.bytes.toByteArray())
+        assertEquals(96000, outputs.statuses.last().sampleRateHz)
+    }
+
+    @Test(timeout = 1000)
+    fun smallDirectWritesStopAtRealBackpressureAndResumeWithoutDroppingOrDuplicatingPcm() {
+        val outputs = FakeOutputs().apply {
+            driver = BitPerfectDriver.USB_DIRECT
+            dacBits = 16
+            maxWriteFrames = 441
+            capacityFrames = 882
+        }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.configure(config(format()))
+        sink.play()
+        val source = pcm16(4096)
+        val expected = bytes(source)
+
+        assertFalse(sink.handleBuffer(source, 2_000_000, 1))
+        val transport = outputs.opened.single()
+        assertEquals(882L, transport.written)
+        assertEquals(listOf(882L), transport.writtenAtPlay)
+        assertTrue("a full native queue must stop the write loop", transport.writeCalls <= 3)
+        val beforeRetry = transport.writeCalls
+        assertFalse(sink.handleBuffer(source, 2_000_000, 1))
+        assertEquals("a zero write yields immediately", 1, transport.writeCalls - beforeRetry)
+        assertEquals(882L, transport.written)
+
+        var complete = false
+        repeat(5) {
+            if (!complete) {
+                transport.advance(882)
+                complete = sink.handleBuffer(source, 2_000_000, 1)
+            }
+        }
+        assertTrue("the pending PCM must finish as native capacity returns", complete)
+        assertEquals(4096L, transport.written)
+        assertFalse(source.hasRemaining())
+        assertArrayEquals(expected, transport.bytes.toByteArray())
+    }
+
+    @Test(timeout = 1000)
+    fun idleUsbResumeDrainsSmallWritesOfTheRawTailBeforePlayingIt() {
+        var now = 0L
+        val outputs = FakeOutputs().apply {
+            driver = BitPerfectDriver.USB_DIRECT
+            softwareDb = -40.0
+            dacBits = 16
+            maxWriteFrames = 441
+        }
+        val sink = BitPerfectAudioSink(outputs) { now }
+        sink.configure(config(format()))
+        sink.play()
+        val source = pcm16(4096)
+        val original = bytes(source)
+        assertTrue(sink.handleBuffer(source, 0, 1))
+        val first = outputs.opened.single()
+        first.advance(1000)
+        sink.pause()
+        val next = pcm16(441, start = 8192)
+        val nextBytes = bytes(next)
+        now = BitPerfectAudioSink.IDLE_RELEASE_MS
+        assertFalse(sink.handleBuffer(next, 100_000, 1))
+        assertTrue(first.released)
+
+        sink.play()
+        assertTrue(sink.handleBuffer(next, 100_000, 1))
+        val resumed = outputs.opened.last()
+        assertEquals(2, outputs.opened.size)
+        assertEquals(listOf(3096L), resumed.writtenAtPlay)
+        assertEquals(3537L, resumed.written)
+        assertEquals(-40.0, resumed.softwareVolumeDb!!, 0.0)
+        assertArrayEquals(original.copyOfRange(1000 * 4, original.size) + nextBytes, resumed.bytes.toByteArray())
+    }
+
+    private fun bytes(buffer: ByteBuffer): ByteArray = ByteArray(buffer.remaining()).also { buffer.duplicate().get(it) }
+
+    private fun pcm24(frames: Int): ByteBuffer = ByteBuffer.allocateDirect(frames * 6).apply {
+        repeat(frames * 2) { index ->
+            val sample = index * 257 - 1_048_576
+            put(sample.toByte())
+            put((sample shr 8).toByte())
+            put((sample shr 16).toByte())
+        }
+        flip()
+    }
+
     @Test
     fun flushKeepsTheDeviceOpenAndRestartsTheClock() {
         val outputs = FakeOutputs()
@@ -283,6 +445,70 @@ class BitPerfectAudioSinkTest {
         sink.handleBuffer(pcm16(4), 0, 1)
         assertFalse(outputs.statuses.last().dacLimited)
         assertTrue(outputs.statuses.last().exact)
+    }
+
+    @Test
+    fun softwareAttenuationIsExclusiveButNeverReportedBitPerfect() {
+        val outputs = FakeOutputs().apply { driver = BitPerfectDriver.USB_DIRECT; softwareDb = -40.0 }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.configure(config(format(rate = 44100)))
+        sink.play()
+        sink.handleBuffer(pcm16(4), 0, 1)
+        val status = outputs.statuses.last()
+        assertTrue(status.active)
+        assertTrue(status.sourceExact)
+        assertFalse(status.exact)
+        assertEquals("software", status.volumeControl)
+        assertEquals(-40.0, status.softwareVolumeDb!!, 0.0)
+        assertEquals(44100, status.sampleRateHz)
+        assertEquals(44100, status.sourceRateHz)
+        assertFalse(status.dacLimited)
+    }
+
+    @Test
+    fun softwareUnityCanBeExactAndAttenuationUpdatesTheVerdict() {
+        val outputs = FakeOutputs().apply { driver = BitPerfectDriver.USB_DIRECT; softwareDb = 0.0 }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.configure(config(format()))
+        sink.play()
+        sink.handleBuffer(pcm16(4), 0, 1)
+        assertTrue(outputs.statuses.last().exact)
+        val transport = outputs.opened.single()
+        transport.softwareDb = -20.0
+        sink.handleBuffer(pcm16(4), 91, 1)
+        assertFalse(outputs.statuses.last().exact)
+        assertEquals(-20.0, outputs.statuses.last().softwareVolumeDb!!, 0.0)
+        transport.softwareDb = 0.0
+        sink.handleBuffer(pcm16(4), 182, 1)
+        assertTrue(outputs.statuses.last().exact)
+    }
+
+    @Test
+    fun pauseSeekTrackAndRateChangesKeepTheTransportVolumePolicy() {
+        val outputs = FakeOutputs().apply { driver = BitPerfectDriver.USB_DIRECT; softwareDb = -40.0 }
+        val sink = BitPerfectAudioSink(outputs)
+        sink.configure(config(format(rate = 44100)))
+        sink.play()
+        sink.handleBuffer(pcm16(4), 0, 1)
+        val first = outputs.opened.single()
+        sink.pause()
+        assertFalse(first.playing)
+        sink.flush()
+        sink.play()
+        sink.handleBuffer(pcm16(4), 10_000_000, 1)
+        assertEquals(-40.0, first.softwareVolumeDb!!, 0.0)
+        assertEquals(1, outputs.opened.size)
+        sink.configure(config(format().buildUpon().setId("next").build()))
+        sink.handleBuffer(pcm16(4), 10_000_091, 1)
+        assertEquals(1, outputs.opened.size)
+        first.advance(first.written)
+        sink.configure(config(format(rate = 48000)))
+        assertTrue(sink.handleBuffer(pcm16(4), 10_000_182, 1))
+        assertEquals(2, outputs.opened.size)
+        val next = outputs.opened.last()
+        assertEquals(48000, next.sampleRate)
+        assertEquals(-40.0, next.softwareVolumeDb!!, 0.0)
+        assertFalse(outputs.statuses.last().exact)
     }
 
     @Test
@@ -461,6 +687,170 @@ class BitPerfectAudioSinkTest {
         assertSame(format, normal.configured)
         assertEquals(1, normal.buffers)
         assertTrue(normal.played)
+    }
+
+    @Test
+    fun strictDirectUsbUnavailableNeverConfiguresOrWritesNormalOutput() {
+        val outputs = FakeOutputs().apply { available = false; directRequired = true }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        try {
+            router.configure(config(format()))
+            fail("Direct USB must fail closed while unavailable")
+        } catch (error: AudioSink.ConfigurationException) {
+            assertTrue(error.cause is DirectUsbSafetyException)
+        }
+        assertEquals(null, normal.configured)
+        assertEquals(0, normal.buffers)
+        assertTrue(outputs.opened.isEmpty())
+    }
+
+    @Test
+    fun strictDirectUsbUnsupportedFormatNeverUsesNormalOutput() {
+        val outputs = FakeOutputs().apply { directRequired = true }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        val unsupported = format().buildUpon().setChannelCount(6).build()
+        try {
+            router.configure(config(unsupported))
+            fail("Unsupported direct format must fail closed")
+        } catch (error: AudioSink.ConfigurationException) {
+            assertTrue(error.cause is DirectUsbSafetyException)
+        }
+        assertEquals(null, normal.configured)
+        assertEquals(0, normal.buffers)
+    }
+
+    @Test
+    fun strictDirectUsbFailedOpenSurfacesNonrecoverableWithoutNormalFallback() {
+        val outputs = FakeOutputs().apply { directRequired = true; failOpen = true }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        router.play()
+        router.configure(config(format()))
+        val samples = pcm16(4)
+        try {
+            router.handleBuffer(samples, 0, 1)
+            fail("Opening failure must stop direct playback")
+        } catch (error: AudioSink.InitializationException) {
+            assertFalse(error.isRecoverable)
+        }
+        assertEquals(0, samples.position())
+        assertEquals(null, normal.configured)
+        assertEquals(0, normal.buffers)
+        assertEquals(1, outputs.failures)
+    }
+
+    @Test
+    fun strictDirectUsbWriteFailureReleasesRouteWithoutNormalFallback() {
+        val outputs = FakeOutputs().apply { directRequired = true; driver = BitPerfectDriver.USB_DIRECT; softwareDb = -40.0 }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        router.configure(config(format()))
+        router.play()
+        router.handleBuffer(pcm16(4), 0, 1)
+        val transport = outputs.opened.single()
+        transport.failOnWrite = true
+        try {
+            router.handleBuffer(pcm16(4), 91, 1)
+            fail("A lost direct stream must stop instead of substituting Android volume")
+        } catch (error: AudioSink.WriteException) {
+            assertFalse(error.isRecoverable)
+        }
+        assertTrue(transport.released)
+        assertEquals(null, normal.configured)
+        assertEquals(0, normal.buffers)
+    }
+
+    @Test
+    fun changingSelectedModeCannotEnableFallbackForTheFailingDirectStream() {
+        val outputs = FakeOutputs().apply { directRequired = true; driver = BitPerfectDriver.USB_DIRECT }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        router.configure(config(format()))
+        router.play()
+        router.handleBuffer(pcm16(4), 0, 1)
+        val transport = outputs.opened.single()
+        // The preference collector can move before the already configured stream is rebuilt.
+        outputs.directRequired = false
+        transport.failOnWrite = true
+        try {
+            router.handleBuffer(pcm16(4), 91, 1)
+            fail("The current Direct USB stream must retain its fail-closed policy")
+        } catch (error: AudioSink.WriteException) {
+            assertFalse(error.isRecoverable)
+            assertTrue(error.cause is DirectUsbSafetyException)
+        }
+        assertTrue(transport.released)
+        assertEquals(0, normal.buffers)
+        assertEquals(null, normal.configured)
+
+        // An explicit new configuration after selecting another output can use Android again.
+        outputs.available = false
+        router.configure(config(format()))
+        assertTrue(router.handleBuffer(pcm16(4), 182, 1))
+        assertEquals(1, normal.buffers)
+        assertFalse(router.isBitPerfect)
+    }
+
+    @Test
+    fun clockFailureAfterTheFinalBufferSurfacesAtEosInsteadOfHangingOrFallingBack() {
+        val outputs = FakeOutputs().apply { directRequired = true; driver = BitPerfectDriver.USB_DIRECT }
+        val normal = RecordingSink()
+        val router = BitPerfectRoutingSink(normal, BitPerfectAudioSink(outputs))
+        router.configure(config(format()))
+        router.play()
+        router.handleBuffer(pcm16(4), 0, 1)
+        val transport = outputs.opened.single()
+        transport.failOnClock = true
+        // Media3 clock polling cannot throw a checked audio write error, so it defers one.
+        router.getCurrentPositionUs(false)
+        try {
+            router.playToEndOfStream()
+            fail("A fatal clock error must surface even when no further decoded buffers arrive")
+        } catch (error: AudioSink.WriteException) {
+            assertFalse(error.isRecoverable)
+            assertTrue(error.cause is DirectUsbSafetyException)
+        }
+        assertTrue(transport.released)
+        assertEquals(0, normal.buffers)
+    }
+
+    @Test
+    fun playerMuteSetBeforeTheFirstBufferReachesTheTransportBeforeAnyWrite() {
+        val outputs = FakeOutputs().apply { directRequired = true; driver = BitPerfectDriver.USB_DIRECT; softwareDb = -40.0 }
+        val router = BitPerfectRoutingSink(RecordingSink(), BitPerfectAudioSink(outputs))
+        router.setVolume(0f)
+        router.configure(config(format()))
+        router.play()
+        assertTrue(router.handleBuffer(pcm16(4), 0, 1))
+        val transport = outputs.opened.single()
+        assertTrue(transport.playerVolumeChanges.isNotEmpty())
+        assertEquals(0f, transport.playerVolumeChanges.first(), 0f)
+        assertTrue(transport.playerVolumeAtWrite.isNotEmpty())
+        assertTrue(transport.playerVolumeAtWrite.all { it == 0f })
+        assertEquals(-40.0, transport.softwareVolumeDb!!, 0.0)
+        assertFalse(outputs.statuses.last().exact)
+    }
+
+    @Test
+    fun audioFocusDuckingUpdatesThePlayerMultiplierWithoutChangingTheUserGain() {
+        val outputs = FakeOutputs().apply { directRequired = true; driver = BitPerfectDriver.USB_DIRECT; softwareDb = -40.0 }
+        val router = BitPerfectRoutingSink(RecordingSink(), BitPerfectAudioSink(outputs))
+        router.configure(config(format()))
+        router.play()
+        router.handleBuffer(pcm16(4), 0, 1)
+        val transport = outputs.opened.single()
+        router.setVolume(0.2f)
+        router.handleBuffer(pcm16(4), 91, 1)
+        assertEquals(0.2f, transport.playerMultiplier, 0f)
+        assertEquals(0.2f, transport.playerVolumeAtWrite.last(), 0f)
+        assertEquals(-40.0, transport.softwareVolumeDb!!, 0.0)
+        router.setVolume(1f)
+        router.handleBuffer(pcm16(4), 182, 1)
+        assertEquals(1f, transport.playerMultiplier, 0f)
+        assertEquals(-40.0, transport.softwareVolumeDb!!, 0.0)
+        assertEquals(listOf(1f, 0.2f, 1f), transport.playerVolumeChanges)
     }
 
     @Test

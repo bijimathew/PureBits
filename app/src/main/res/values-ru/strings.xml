@@ -1464,16 +1464,16 @@
     <string name="font_footer">«Прежний» возвращает более жирный и плотный шрифт, который приложение использовало до того, как его привели в соответствие с Apple Music.</string>
     <string name="bit_perfect_output">Вывод bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">Вывод bit-perfect готов, поэтому затенённые настройки не применяются, а версии Dolby Atmos не запрашиваются. Они снова заработают, когда ЦАП будет отключён или режим выключен.</string>
-    <string name="bit_perfect_sheet_warning">Отправляет трек на ЦАП без изменений. Эквалайзер, нормализация громкости, кроссфейд, автомикс, скорость воспроизведения и громкость BitChord не применяются.</string>
+    <string name="bit_perfect_sheet_warning">Эксклюзивный вывод обходит эффекты, нормализацию, переходы и скорость. Прямой USB поддерживает программную громкость; изменённые отсчёты не являются bit-perfect.</string>
     <string name="bit_perfect_mode_off_subtitle">Звук проходит через микшер Android и эффекты BitChord.</string>
-    <string name="bit_perfect_mode_usb_android">USB-ЦАП</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 открывает ЦАП с частотой и разрядностью каждого трека, без микширования и передискретизации.</string>
+    <string name="bit_perfect_mode_usb_android">USB-ЦАП (системный путь Android)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Требуется Android 14+ и поддержка bit-perfect USB в телефоне. Android может не предоставлять этот режим для подключённого ЦАП.</string>
     <string name="bit_perfect_requires_android_14">Требуется Android 14 или новее</string>
     <string name="bit_perfect_mode_dap_exclusive">Встроенный ЦАП (AAudio, эксклюзивно)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">Для музыкальных плееров с собственным ЦАП. Открывает выход на наушники или линейный выход эксклюзивно с частотой каждого трека. Эксклюзивный режим доступен не на всех устройствах.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Для встроенного проводного выхода наушников или линейного выхода, не USB-наушников. Android должен разрешить эксклюзивный режим; многие телефоны этого не делают.</string>
     <string name="bit_perfect_requires_android_8_1">Требуется Android 8.1 или новее</string>
     <string name="bit_perfect_mode_usb_direct">USB-ЦАП (прямой драйвер)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord сам управляет ЦАП в любой версии Android и задаёт громкость на ЦАП. Запрашивает разрешение USB. Звук может быть намного громче обычного вывода.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">Авто использует программную громкость. Аппаратную выбирайте только после проверки регулятора ЦАП.</string>
     <string name="dac_volume">Громкость ЦАП</string>
     <string name="dac_volume_subtitle">Задаётся на самом ЦАП; музыка не масштабируется</string>
     <string name="usb_allow_fixed_volume">Разрешить ЦАП без регулировки громкости</string>
@@ -1482,8 +1482,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord не может задать громкость такого ЦАП, поэтому он играет на полной шкале, а уровень регулирует только его собственная ручка, если она есть. С чувствительными наушниками это может быть опасно громко.</string>
     <string name="convert_for_limited_dac">Преобразование для слабых ЦАП</string>
     <string name="convert_for_limited_dac_subtitle">Преобразует треки сверх предела вашего ЦАП в его наивысший формат. Треки могут запускаться дольше и не будут bit-perfect относительно оригинала.</string>
-    <string name="bit_perfect_confirm_title">Включить вывод bit-perfect?</string>
-    <string name="bit_perfect_confirm_message">ЦАП получает музыку на полной шкале, а кнопки громкости телефона могут перестать работать. Перед воспроизведением убавьте громкость ЦАП или усилителя.</string>
+    <string name="bit_perfect_confirm_title">Включить эксклюзивный вывод?</string>
+    <string name="bit_perfect_confirm_message">Перед первым воспроизведением выньте наушники и проверьте фактический уровень. Прямой USB начинает с низкой программной громкости. Другие режимы могут зависеть от громкости ЦАП.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s кГц · %3$d бит</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s кГц · %3$d бит · максимум ЦАП, преобразовано из формата этого трека</string>
     <string name="bit_perfect_status_inexact">%1$s · неточно: этот источник не является PCM без потерь</string>
@@ -1498,4 +1498,22 @@
     <string name="diwali_title">BitChord желает вам счастливого Дивали</string>
     <string name="diwali_subtitle">Пусть этот праздник огней наполнит ваш дом радостью, а каждый день — музыкой.</string>
     <string name="diwali_cta">Давайте праздновать</string>
+    <string name="usb_direct_volume_mode" formatted="false">Режим громкости прямого USB</string>
+    <string name="usb_volume_auto" formatted="false">Авто</string>
+    <string name="usb_volume_hardware" formatted="false">Аппаратная громкость</string>
+    <string name="usb_volume_software" formatted="false">Безопасная программная громкость</string>
+    <string name="usb_volume_mode_description" formatted="false">Авто использует программную громкость. Аппаратную выбирайте только после проверки регулятора ЦАП.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">Новые сеансы USB начинаются с -40 дБ или тише; 0% отключает звук. Процент не определяет безопасную громкость.</string>
+    <string name="usb_high_volume_title" formatted="false">Разрешить более высокую громкость USB?</string>
+    <string name="usb_high_volume_warning" formatted="false">Выше -20 дБ звук может быть очень громким. Выньте наушники перед повышением громкости. Разрешение действует для этого сеанса USB и не подтверждает безопасность уровня.</string>
+    <string name="usb_high_volume_allow" formatted="false">Понятно</string>
+    <string name="usb_hardware_volume_warning" formatted="false">Данные оборудования могут быть неверными. Для Bunny DSP и непроверенных устройств выбирайте программную громкость. Перед проверкой оборудования выньте наушники. При сбое включается программная громкость или воспроизведение останавливается.</string>
+    <string name="bit_perfect_status_software">%1$s · эксклюзивный USB · программная громкость %2$s дБ</string>
+    <string name="usb_direct_stopped">Воспроизведение через USB остановлено. Проверьте ЦАП и разрешение USB или выберите другой выход перед повторным воспроизведением.</string>
+    <string name="bit_perfect_unavailable_no_usb">Подключите USB-ЦАП. Если прямой USB только что освободил его, дождитесь восстановления аудиомаршрута Android.</string>
+    <string name="bit_perfect_unavailable_no_wired">Этот режим требует встроенного проводного выхода наушников или линейного выхода. USB-наушники используют режим USB-ЦАП.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android не предоставляет пригодный bit-perfect USB-микшер для этого ЦАП. Сам Android 14 не гарантирует поддержку.</string>
+    <string name="bit_perfect_unavailable_permission">Требуется разрешение USB. Выберите прямой USB и подтвердите системный запрос.</string>
+    <string name="bit_perfect_unavailable_format">Для этого трека нет совместимого эксклюзивного формата. Выберите другой выход, чтобы продолжить.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android отказал в истинно эксклюзивном воспроизведении AAudio на проводном выходе.</string>
 </resources>

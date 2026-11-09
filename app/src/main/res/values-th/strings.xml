@@ -1415,16 +1415,16 @@
     <string name="font_footer">แบบเดิมจะนำตัวอักษรที่หนาและชิดกว่าซึ่งแอปเคยใช้ก่อนปรับให้เข้ากับ Apple Music กลับมา</string>
     <string name="bit_perfect_output">เอาต์พุต Bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">เอาต์พุต Bit-perfect พร้อมแล้ว การตั้งค่าที่จางจึงถูกข้ามและจะไม่ขอเวอร์ชัน Dolby Atmos การตั้งค่าเหล่านี้จะกลับมาทำงานเมื่อถอด DAC หรือปิดโหมดนี้</string>
-    <string name="bit_perfect_sheet_warning">ส่งแทร็กไปยัง DAC โดยไม่เปลี่ยนแปลง อีควอไลเซอร์ การปรับระดับความดัง ครอสเฟด Automix ความเร็วในการเล่น และระดับเสียงของ BitChord จะถูกข้าม</string>
+    <string name="bit_perfect_sheet_warning">เอาต์พุตแบบเอกสิทธิ์ข้ามเอฟเฟกต์ การปรับความดัง ครอสเฟด และความเร็ว USB โดยตรงใช้ระดับเสียงซอฟต์แวร์ได้ แต่ตัวอย่างที่ปรับแล้วไม่ใช่บิตเพอร์เฟกต์</string>
     <string name="bit_perfect_mode_off_subtitle">เสียงจะผ่านมิกเซอร์ของ Android และเอฟเฟกต์ของ BitChord</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 เปิด DAC ที่อัตราและความลึกบิตของแต่ละแทร็ก โดยไม่มิกซ์หรือรีแซมเปิล</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC (เส้นทางดั้งเดิมของ Android)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">ต้องใช้ Android 14 ขึ้นไปและโทรศัพท์ที่รองรับ USB บิตเพอร์เฟกต์ Android อาจไม่เปิดโหมดนี้สำหรับ DAC ที่เชื่อมต่อ</string>
     <string name="bit_perfect_requires_android_14">ต้องใช้ Android 14 ขึ้นไป</string>
     <string name="bit_perfect_mode_dap_exclusive">DAC ในตัว (AAudio แบบเอกสิทธิ์)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">สำหรับเครื่องเล่นเพลงที่มี DAC ของตัวเอง เปิดเอาต์พุตหูฟังหรือไลน์แบบเอกสิทธิ์ที่อัตราของแต่ละแทร็ก บางอุปกรณ์อาจไม่อนุญาตโหมดเอกสิทธิ์</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">สำหรับช่องหูฟังแบบมีสายหรือไลน์เอาต์ของ DAC ในตัว ไม่ใช่หูฟัง USB Android ต้องอนุญาตโหมดเอกสิทธิ์ ซึ่งโทรศัพท์จำนวนมากไม่รองรับ</string>
     <string name="bit_perfect_requires_android_8_1">ต้องใช้ Android 8.1 ขึ้นไป</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC (ไดรเวอร์โดยตรง)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord ควบคุม DAC เองบน Android ทุกเวอร์ชัน และตั้งระดับเสียงที่ DAC ต้องขอสิทธิ์ USB เสียงอาจดังกว่าเอาต์พุตปกติมาก</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">อัตโนมัติใช้ระดับเสียงซอฟต์แวร์ ใช้ฮาร์ดแวร์เฉพาะ DAC ที่ตรวจสอบการควบคุมแล้วเท่านั้น</string>
     <string name="dac_volume">ระดับเสียงของ DAC</string>
     <string name="dac_volume_subtitle">ตั้งที่ตัว DAC เอง เพลงจะไม่ถูกปรับสเกล</string>
     <string name="usb_allow_fixed_volume">อนุญาต DAC ที่ไม่มีการควบคุมระดับเสียง</string>
@@ -1433,8 +1433,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord ตั้งระดับเสียงของ DAC ประเภทนี้ไม่ได้ จึงเล่นที่ระดับเต็มสเกล และมีเพียงปุ่มหมุนของ DAC เอง (หากมี) ที่ควบคุมความดังได้ เสียงอาจดังจนเป็นอันตรายกับหูฟังที่มีความไวสูง</string>
     <string name="convert_for_limited_dac">แปลงสำหรับ DAC สเปกต่ำ</string>
     <string name="convert_for_limited_dac_subtitle">แปลงแทร็กที่เกินขีดจำกัดของ DAC เป็นฟอร์แมตสูงสุดของ DAC แทร็กอาจเริ่มเล่นช้าลงและจะไม่เป็น Bit-perfect เมื่อเทียบกับต้นฉบับ</string>
-    <string name="bit_perfect_confirm_title">เปิดเอาต์พุต Bit-perfect ไหม</string>
-    <string name="bit_perfect_confirm_message">DAC จะได้รับเพลงที่ระดับเต็มสเกล และปุ่มระดับเสียงของโทรศัพท์อาจใช้ไม่ได้ ลดระดับเสียงของ DAC หรือแอมป์ก่อนเล่น</string>
+    <string name="bit_perfect_confirm_title">เปิดเอาต์พุตแบบเอกสิทธิ์หรือไม่?</string>
+    <string name="bit_perfect_confirm_message">ถอดหูฟังก่อนเล่นครั้งแรกและตรวจสอบระดับเสียงจริง USB โดยตรงเริ่มด้วยระดับเสียงซอฟต์แวร์ต่ำ โหมดอื่นอาจขึ้นอยู่กับระดับเสียง DAC</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d บิต</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d บิต · สูงสุดของ DAC แปลงจากฟอร์แมตของแทร็กนี้</string>
     <string name="bit_perfect_status_inexact">%1$s · ไม่ตรงทุกบิต: แหล่งนี้ไม่ใช่ PCM แบบไม่สูญเสียคุณภาพ</string>
@@ -1449,4 +1449,22 @@
     <string name="diwali_title">BitChord ขอให้คุณมีความสุขในเทศกาลดิวาลี</string>
     <string name="diwali_subtitle">ขอให้เทศกาลแห่งแสงสว่างนี้เติมเต็มบ้านของคุณด้วยความสุขและทุกวันด้วยเสียงเพลง</string>
     <string name="diwali_cta">มาฉลองกัน</string>
+    <string name="usb_direct_volume_mode" formatted="false">โหมดระดับเสียง USB โดยตรง</string>
+    <string name="usb_volume_auto" formatted="false">อัตโนมัติ</string>
+    <string name="usb_volume_hardware" formatted="false">ระดับเสียงฮาร์ดแวร์</string>
+    <string name="usb_volume_software" formatted="false">ระดับเสียงซอฟต์แวร์แบบปลอดภัย</string>
+    <string name="usb_volume_mode_description" formatted="false">อัตโนมัติใช้ระดับเสียงซอฟต์แวร์ ใช้ฮาร์ดแวร์เฉพาะ DAC ที่ตรวจสอบการควบคุมแล้วเท่านั้น</string>
+    <string name="usb_software_volume_subtitle" formatted="false">เซสชัน USB ใหม่เริ่มที่ -40 dB หรือต่ำกว่า; 0% คือปิดเสียง เปอร์เซ็นต์ไม่ใช่ขีดจำกัดความปลอดภัยต่อการได้ยิน</string>
+    <string name="usb_high_volume_title" formatted="false">อนุญาตให้เพิ่มระดับเสียง USB หรือไม่?</string>
+    <string name="usb_high_volume_warning" formatted="false">ระดับที่สูงกว่า -20 dB อาจดังมาก ถอดหูฟังก่อนเพิ่มเสียง การอนุญาตนี้ใช้กับเซสชัน USB นี้เท่านั้น ไม่ใช่การรับรองว่าระดับเสียงปลอดภัย</string>
+    <string name="usb_high_volume_allow" formatted="false">เข้าใจแล้ว</string>
+    <string name="usb_hardware_volume_warning" formatted="false">ข้อมูลฮาร์ดแวร์อาจผิดพลาด ใช้ซอฟต์แวร์กับ Bunny DSP หรืออุปกรณ์ที่ยังไม่ยืนยัน ถอดหูฟังก่อนทดสอบฮาร์ดแวร์ หากล้มเหลวจะใช้ซอฟต์แวร์หรือหยุดเล่น</string>
+    <string name="bit_perfect_status_software">%1$s · USB แบบเอกสิทธิ์ · ระดับเสียงซอฟต์แวร์ %2$s dB</string>
+    <string name="usb_direct_stopped">การเล่นผ่าน USB หยุดแล้ว ตรวจสอบ DAC และสิทธิ์ USB หรือเลือกเอาต์พุตอื่นก่อนเล่นอีกครั้ง</string>
+    <string name="bit_perfect_unavailable_no_usb">เชื่อมต่อ USB DAC หาก USB โดยตรงเพิ่งปล่อยอุปกรณ์ ให้รอ Android เชื่อมต่อเส้นทางเสียงอีกครั้ง</string>
+    <string name="bit_perfect_unavailable_no_wired">โหมดนี้ต้องใช้ช่องหูฟังแบบมีสายหรือไลน์เอาต์ในตัว หูฟัง USB ใช้โหมด USB DAC</string>
+    <string name="bit_perfect_unavailable_native_usb">Android ไม่ได้เปิดมิกเซอร์ USB บิตเพอร์เฟกต์ที่ใช้ได้สำหรับ DAC นี้ Android 14 เพียงอย่างเดียวไม่ได้รับประกันว่ารองรับ</string>
+    <string name="bit_perfect_unavailable_permission">ต้องมีสิทธิ์ USB เลือก USB โดยตรงและอนุมัติคำขอของระบบ</string>
+    <string name="bit_perfect_unavailable_format">ไม่มีรูปแบบเอกสิทธิ์ที่เข้ากันได้สำหรับเพลงนี้ เลือกเอาต์พุตอื่นเพื่อเล่นต่อ</string>
+    <string name="bit_perfect_unavailable_exclusive">Android ปฏิเสธการเล่น AAudio แบบเอกสิทธิ์จริงบนเอาต์พุตแบบมีสาย</string>
 </resources>

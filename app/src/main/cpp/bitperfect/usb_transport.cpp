@@ -10,7 +10,7 @@
 
 // A mixer-free USB Audio Class output: Android grants permission and opens
 // the device; one worker thread here owns libusb, the claimed interfaces,
-// four isochronous OUT transfers and the explicit feedback transfer. No
+// up to sixteen isochronous OUT transfers and the explicit feedback transfer. No
 // resampling or gain happens anywhere below the queue.
 //
 // Every raw libusb pointer belongs to the worker. Transfer buffers keep
@@ -23,6 +23,7 @@
 // (UsbDescriptors.kt); this side is handed the candidates in preference order
 // and opens the first one the device accepts.
 
+#include <android/log.h>
 #include <jni.h>
 #include <libusb.h>
 #include <sys/resource.h>
@@ -43,6 +44,8 @@
 #include <vector>
 
 #include "usb_stream.h"
+#include "usb_transfer_health.h"
+#include "usb_pcm_queue.h"
 
 using namespace usbaudio;
 
@@ -76,6 +79,18 @@ struct Candidate {
 };
 
 constexpr int kCandidateInts = 17;
+const char *transferStatusName(libusb_transfer_status status) {
+    switch (status) {
+        case LIBUSB_TRANSFER_COMPLETED: return "completed";
+        case LIBUSB_TRANSFER_ERROR: return "error";
+        case LIBUSB_TRANSFER_TIMED_OUT: return "timed out";
+        case LIBUSB_TRANSFER_CANCELLED: return "cancelled";
+        case LIBUSB_TRANSFER_STALL: return "stalled";
+        case LIBUSB_TRANSFER_NO_DEVICE: return "disconnected";
+        case LIBUSB_TRANSFER_OVERFLOW: return "overflow";
+    }
+    return "unknown";
+}
 
 struct ControlRequest {
     bool input;
@@ -90,7 +105,8 @@ struct ControlRequest {
 struct State {
     std::mutex mutex;
     std::condition_variable changed;
-    std::deque<uint8_t> bytes;
+    std::vector<uint8_t> queueStorage;
+    PcmByteQueue bytes;
     bool playing = false;
     bool closed = false;
     uint64_t frames = 0;
@@ -106,6 +122,7 @@ struct Slot {
     bool pending = false;
     bool submitted = false;
     uint64_t musicFrames = 0;
+    uint64_t sequence = 0;
 
     Slot(int packets, size_t maxBytes) : bytes(static_cast<size_t>(packets) * maxBytes) {
         transfer = libusb_alloc_transfer(packets);
@@ -141,6 +158,39 @@ struct Slot {
         return true;
     }
 
+    TransferOutcome outcome() const {
+        // Only packet-level losses in an otherwise completed transfer are
+        // recoverable. Disconnects, timeouts, stalls and invalid transfers stop
+        // immediately. Replaying the missed bytes would corrupt the timeline.
+        if (transfer->status != LIBUSB_TRANSFER_COMPLETED) return TransferOutcome::Fatal;
+        bool missed = false;
+        for (int i = 0; i < transfer->num_iso_packets; ++i) {
+            const auto &packet = transfer->iso_packet_desc[i];
+            if (packet.actual_length > packet.length) return TransferOutcome::Fatal;
+            if (packet.status != LIBUSB_TRANSFER_COMPLETED &&
+                packet.status != LIBUSB_TRANSFER_ERROR && packet.status != LIBUSB_TRANSFER_TIMED_OUT) {
+                return TransferOutcome::Fatal;
+            }
+            missed |= packet.status != LIBUSB_TRANSFER_COMPLETED || packet.actual_length != packet.length;
+        }
+        return missed ? TransferOutcome::PacketLoss : TransferOutcome::Complete;
+    }
+
+    void logFailure(uint64_t count) const {
+        // Rate-limit recurring packet loss. Never log audio bytes or device
+        // serial numbers, and use transfer statuses rather than error codes.
+        if (count != 1 && count % 128 != 0) return;
+        int bad = 0;
+        for (int i = 0; i < transfer->num_iso_packets; ++i) {
+            const auto &packet = transfer->iso_packet_desc[i];
+            if (packet.status != LIBUSB_TRANSFER_COMPLETED || packet.actual_length != packet.length) ++bad;
+        }
+        __android_log_print(ANDROID_LOG_WARN, "PureBitsUsb",
+                            "Audio transfer %s; %d/%d missed packets; failures=%llu",
+                            transferStatusName(transfer->status), bad, transfer->num_iso_packets,
+                            static_cast<unsigned long long>(count));
+    }
+
     size_t actual() const { return transfer->iso_packet_desc[0].actual_length; }
 };
 
@@ -157,6 +207,17 @@ public:
     std::unique_ptr<Slot> feedbackSlot;
 
     Session(int fd, const std::vector<Candidate> &candidates) {
+        try {
+            initialize(fd, candidates);
+        } catch (...) {
+            // A throwing constructor has no destructor. Release a partially
+            // claimed device/context so Android can reacquire it after refusal.
+            shutdown();
+            throw;
+        }
+    }
+
+    void initialize(int fd, const std::vector<Candidate> &candidates) {
         // NO_DEVICE_DISCOVERY is required on Android: the USB permission grant
         // is the file descriptor, not a scan of /dev.
         libusb_init_option option{};
@@ -176,20 +237,26 @@ public:
             }
             chosenIndex = static_cast<int>(i);
             const int packets = packetsPerTransfer();
-            for (int s = 0; s < 4; ++s) slots.push_back(std::make_unique<Slot>(packets, chosen.data.maxPacket));
+            // Bound scheduled audio by time even for full-speed 8 ms packets.
+            const int count = transferSlotCount(static_cast<uint64_t>(packets) * interval);
+            for (int s = 0; s < count; ++s) slots.push_back(std::make_unique<Slot>(packets, chosen.data.maxPacket));
             if (chosen.hasFeedback) feedbackSlot = std::make_unique<Slot>(1, chosen.feedback.maxPacket);
             return;
         }
         throw std::runtime_error(failure);
     }
 
-    ~Session() {
+    ~Session() { shutdown(); }
+
+    void shutdown() {
         drain();
         slots.clear();
         feedbackSlot.reset();
         release();
         if (handle) libusb_close(handle);
+        handle = nullptr;
         if (context) libusb_exit(context);
+        context = nullptr;
     }
 
     int packetsPerTransfer() const {
@@ -291,6 +358,18 @@ public:
         uint8_t marker = 0x05;
         auto lastFeedback = std::chrono::steady_clock::now();
         bool started = false;
+        StartupPrefill prefill;
+        const uint64_t scheduledUs = static_cast<uint64_t>(packets) * interval * slots.size();
+        const size_t prefillBytes = static_cast<size_t>(
+            (static_cast<uint64_t>(chosen.format.sampleRate) * scheduledUs + 999999) / 1000000) * frame;
+        TransferHealth health;
+        uint64_t failures = 0;
+        uint64_t sequence = 0;
+        uint64_t paddingFrames = 0;
+        uint64_t musicFrames = 0;
+        bool hadMusic = false;
+        bool reportedPadding = false;
+        auto lastPaddingReport = std::chrono::steady_clock::now();
         for (;;) {
             events();
             std::unique_lock<std::mutex> lock(state.mutex);
@@ -313,16 +392,33 @@ public:
                     slot->musicFrames = 0;
                     slot->submitted = false;
                 }
+                if (feedbackSlot) feedbackSlot->submitted = false;
                 clock = PacketClock(chosen.format.sampleRate, interval);
                 marker = 0x05;
                 started = false;
+                prefill.reset();
+                paddingFrames = musicFrames = 0;
+                hadMusic = false;
+                health.reset();
                 state.changed.notify_all();
             }
             // Account for transfers that completed, playing or not, so a pause
             // does not hold back the frame count by what was in flight.
-            for (auto &slot : slots) {
-                if (slot->pending || !slot->submitted) continue;
-                require(slot->success(), "USB audio transfer failed");
+            for (;;) {
+                // Account in submission order even when completion callbacks
+                // arrive together/out of order. The failure budget and playhead
+                // must describe the stream timeline, not vector iteration order.
+                Slot *slot = nullptr;
+                for (auto &candidate : slots) {
+                    if (candidate->submitted && (!slot || candidate->sequence < slot->sequence)) slot = candidate.get();
+                }
+                if (!slot || slot->pending) break;
+                const auto outcome = slot->outcome();
+                if (outcome != TransferOutcome::Complete) slot->logFailure(++failures);
+                require(health.accept(outcome, static_cast<uint64_t>(packets) * interval),
+                        outcome == TransferOutcome::Fatal ? "USB audio transfer failed" : "USB packet loss persisted");
+                // Lost isochronous packets cannot be retried. Advance past their
+                // media frames rather than replay old samples after recovery.
                 state.frames += slot->musicFrames;
                 slot->musicFrames = 0;
                 slot->submitted = false;
@@ -330,11 +426,23 @@ public:
             if (!state.playing) {
                 // Resuming after a pause restarts the feedback watchdog.
                 started = false;
+                prefill.reset();
+                paddingFrames = musicFrames = 0;
+                hadMusic = false;
                 state.changed.wait_for(lock, std::chrono::milliseconds(20));
                 continue;
             }
             if (!started) {
-                lastFeedback = std::chrono::steady_clock::now();
+                const auto now = std::chrono::steady_clock::now();
+                const auto nowUs = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+                if (!prefill.ready(state.bytes.size(), prefillBytes, static_cast<uint64_t>(nowUs))) {
+                    // wait_for releases the queue lock, so the decoder can fill
+                    // it. Without this, one 10 ms chunk was followed by ~54 ms
+                    // of avoidable padding in the first scheduled transfer ring.
+                    state.changed.wait_for(lock, std::chrono::milliseconds(1));
+                    continue;
+                }
+                lastFeedback = now;
                 started = true;
             }
             if (feedbackSlot) {
@@ -360,11 +468,28 @@ public:
                     total += lengths[i];
                 }
                 const size_t available = std::min(total, state.bytes.size()) / frame * frame;
-                std::copy(state.bytes.begin(), state.bytes.begin() + static_cast<long>(available), slot->bytes.begin());
-                state.bytes.erase(state.bytes.begin(), state.bytes.begin() + static_cast<long>(available));
+                require(state.bytes.read(slot->bytes.data(), available) == available, "USB PCM queue lost frames");
                 finishTransfer(slot->bytes.data(), total, available, chosen.format, marker);
                 slot->musicFrames = available / frame;
+                if (available > 0) hadMusic = true;
+                if (hadMusic) {
+                    musicFrames += available / frame;
+                    paddingFrames += (total - available) / frame;
+                }
+                slot->sequence = sequence++;
                 slot->submit(handle, chosen.data.address, lengths, packets);
+            }
+            const auto now = std::chrono::steady_clock::now();
+            if (paddingFrames > 0 && (!reportedPadding || now - lastPaddingReport >= std::chrono::seconds(5))) {
+                // Separate decoder/producer starvation from lost USB packets.
+                // End-of-stream padding is normal too; this is diagnostic only.
+                __android_log_print(ANDROID_LOG_INFO, "PureBitsUsb",
+                                    "PCM queue padding: %llu silent / %llu media frames; queued=%zu bytes",
+                                    static_cast<unsigned long long>(paddingFrames),
+                                    static_cast<unsigned long long>(musicFrames), state.bytes.size());
+                paddingFrames = musicFrames = 0;
+                reportedPadding = true;
+                lastPaddingReport = now;
             }
             state.changed.notify_all();
         }
@@ -410,7 +535,11 @@ public:
                 std::lock_guard<std::mutex> lock(state.mutex);
                 state.error = e.what();
                 state.playing = false;
+                state.bytes.clear();
+                state.changed.notify_all();
             }
+            // No post-error playback or hardware gain restoration: destruction
+            // cancels every pending transfer before releasing the interfaces.
             session.reset();
             std::lock_guard<std::mutex> lock(state.mutex);
             for (auto &request : state.controls) {
@@ -423,23 +552,27 @@ public:
             auto [index, chosenFormat] = result.get();
             chosen = index;
             format = chosenFormat;
+            frameBytes = static_cast<size_t>(format.subslot) * format.channels;
+            capacity = queueCapacityBytes(format.sampleRate, frameBytes);
+            require(capacity >= frameBytes, "Invalid USB queue capacity");
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.queueStorage.resize(capacity);
+            require(state.bytes.reset(state.queueStorage.data(), capacity), "USB PCM queue initialization failed");
         } catch (...) {
-            worker.join();
+            close();
             throw;
         }
-        frameBytes = static_cast<size_t>(format.subslot) * format.channels;
-        capacity = std::max<size_t>(static_cast<size_t>(format.sampleRate) * frameBytes / 5, 256 * 1024);
     }
 
     ~Output() { close(); }
 
-    // Nonblocking: takes what fits in the bounded queue (about 200 ms).
+    // Nonblocking: takes what fits in the bounded queue (100 ms of frames).
     int write(const uint8_t *data, size_t size) {
         require(size <= 256 * 1024 && size % frameBytes == 0, "Invalid USB frame buffer");
         std::lock_guard<std::mutex> lock(state.mutex);
         throwIfFailed();
         const size_t n = std::min(size, capacity - std::min(capacity, state.bytes.size())) / frameBytes * frameBytes;
-        state.bytes.insert(state.bytes.end(), data, data + n);
+        require(state.bytes.write(data, n) == n, "USB PCM queue overflow");
         state.changed.notify_all();
         return static_cast<int>(n);
     }
@@ -466,7 +599,8 @@ public:
         require(done, "USB cancellation timed out");
     }
 
-    // Completed USB frames since the last flush, excluding inserted silence.
+    // Consumed media frames since the last flush, excluding inserted silence.
+    // Includes unrecoverably missed packets so the playhead never repeats them.
     uint64_t frames() {
         std::lock_guard<std::mutex> lock(state.mutex);
         if (!state.error.empty()) throw std::runtime_error(state.error);

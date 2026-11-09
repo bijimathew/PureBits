@@ -14,7 +14,10 @@ class DacVolumeTest {
         UsbVolume.Snapshot(available = true, minDb = min, maxDb = max, currentDb = current, restoreLimitDb = current)
 
     @After
-    fun clear() = DacVolume.onSnapshot(null)
+    fun clear() {
+        DacVolume.onSnapshot(null)
+        DacVolume.resetSoftwareSession()
+    }
 
     @Test
     fun travelStartsAtMinus80SoTheLowerHalfIsAudible() {
@@ -47,5 +50,79 @@ class DacVolumeTest {
         DacVolume.onSnapshot(UsbVolume.Snapshot(available = false))
         assertNull(DacVolume.level.value)
         assertFalse(DacVolume.step(+1))
+    }
+
+    @Test
+    fun softwareSnapshotUsesActualGainAndKeysMoveOneDb() {
+        DacVolume.onSoftwareVolume(-40.0)
+        assertEquals(0.5f, DacVolume.level.value!!, 0f)
+        assertTrue(DacVolume.step(1))
+        assertEquals(41f / 80f, DacVolume.level.value!!, 1e-6f)
+    }
+
+    @Test
+    fun highSoftwareVolumeWaitsForForegroundConfirmation() {
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(1f)
+        assertEquals(0.75f, DacVolume.level.value!!, 0f)
+        assertTrue(DacVolume.highVolumeRequested.value)
+        DacVolume.confirmHighVolume()
+        assertEquals(1f, DacVolume.level.value!!, 0f)
+        assertFalse(DacVolume.highVolumeRequested.value)
+    }
+
+    @Test
+    fun repeatedVolumeUpCannotBypassConfirmation() {
+        DacVolume.onSoftwareVolume(-20.0)
+        repeat(200) { assertFalse(DacVolume.step(1)) }
+        assertEquals(0.75f, DacVolume.level.value!!, 0f)
+        DacVolume.dismissHighVolume()
+        assertEquals(0.75f, DacVolume.level.value!!, 0f)
+    }
+
+    @Test
+    fun invalidSoftwareLevelMutesRatherThanRaisingGain() {
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(Float.NaN)
+        assertEquals(0f, DacVolume.level.value!!, 0f)
+        DacVolume.set(Float.POSITIVE_INFINITY)
+        assertEquals(0f, DacVolume.level.value!!, 0f)
+    }
+
+    @Test
+    fun laterDownRequestCancelsPendingHighVolume() {
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(1f)
+        DacVolume.set(0.5f)
+        DacVolume.confirmHighVolume()
+        assertEquals(0.5f, DacVolume.level.value!!, 0f)
+        assertFalse(DacVolume.highVolumeRequested.value)
+    }
+
+    @Test
+    fun softwareSessionResetRequiresNewHighOutputConsent() {
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(1f)
+        DacVolume.confirmHighVolume()
+        DacVolume.onSoftwareVolume(null)
+        DacVolume.resetSoftwareSession()
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(1f)
+        assertEquals(0.75f, DacVolume.level.value!!, 0f)
+        assertTrue(DacVolume.highVolumeRequested.value)
+    }
+
+    @Test
+    fun trackReopenRetainsConsentButClearsPendingDialogWhenInactive() {
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(1f)
+        DacVolume.confirmHighVolume()
+        DacVolume.onSoftwareVolume(null)
+        assertNull(DacVolume.level.value)
+        assertFalse(DacVolume.highVolumeRequested.value)
+        DacVolume.onSoftwareVolume(-40.0)
+        DacVolume.set(1f)
+        assertEquals(1f, DacVolume.level.value!!, 0f)
+        assertFalse(DacVolume.highVolumeRequested.value)
     }
 }

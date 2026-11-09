@@ -1282,16 +1282,16 @@
     <string name="font_footer">이전 글꼴은 앱이 Apple Music에 맞춰지기 전에 쓰던 더 굵고 촘촘한 글꼴을 되돌립니다.</string>
     <string name="bit_perfect_output">비트 퍼펙트 출력</string>
     <string name="bit_perfect_bypassed_footer">비트 퍼펙트 출력이 준비되어 흐리게 표시된 설정은 우회되고 Dolby Atmos 버전은 요청되지 않습니다. DAC를 분리하거나 모드를 끄면 다시 작동합니다.</string>
-    <string name="bit_perfect_sheet_warning">트랙을 변경 없이 DAC로 보냅니다. 이퀄라이저, 체감 음량 평준화, 크로스페이드, 자동 믹스, 재생 속도, BitChord 음량은 우회됩니다.</string>
+    <string name="bit_perfect_sheet_warning">독점 출력은 효과, 음량 정규화, 크로스페이드 및 속도를 우회합니다. 직접 USB는 소프트웨어 음량을 적용할 수 있으며 변경된 샘플은 비트 퍼펙트가 아닙니다.</string>
     <string name="bit_perfect_mode_off_subtitle">오디오가 Android 믹서와 BitChord 효과를 거칩니다.</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14가 믹싱이나 리샘플링 없이 각 트랙의 샘플레이트와 비트 심도로 DAC를 엽니다.</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC(Android 기본 경로)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 이상과 휴대전화의 비트 퍼펙트 USB 지원이 필요합니다. 연결된 DAC에 이 모드가 제공되지 않을 수 있습니다.</string>
     <string name="bit_perfect_requires_android_14">Android 14 이상 필요</string>
     <string name="bit_perfect_mode_dap_exclusive">내장 DAC(AAudio 독점)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">자체 DAC가 있는 음악 플레이어용입니다. 헤드폰 또는 라인 출력을 각 트랙의 샘플레이트로 독점해서 엽니다. 모든 기기가 독점 모드를 허용하는 것은 아닙니다.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">내장 DAC의 유선 헤드폰 또는 라인 출력용이며 USB 이어폰용이 아닙니다. Android가 독점 모드를 허용해야 하며 많은 휴대전화에서는 허용하지 않습니다.</string>
     <string name="bit_perfect_requires_android_8_1">Android 8.1 이상 필요</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC(직접 드라이버)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">어떤 Android 버전에서든 BitChord가 DAC를 직접 구동하고 음량을 DAC에서 설정합니다. USB 권한을 요청합니다. 일반 출력보다 훨씬 크게 들릴 수 있습니다.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">자동은 소프트웨어 음량을 사용합니다. 제어 기능을 확인한 DAC에서만 하드웨어를 사용하세요.</string>
     <string name="dac_volume">DAC 음량</string>
     <string name="dac_volume_subtitle">DAC 자체에서 설정되며 음악 데이터는 조정되지 않습니다</string>
     <string name="usb_allow_fixed_volume">음량 조절이 없는 DAC 허용</string>
@@ -1300,8 +1300,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord에서 이 유형의 DAC 음량을 설정할 수 없어 최대 레벨로 재생되며, DAC 자체의 노브가 있는 경우에만 음량을 조절할 수 있습니다. 민감한 헤드폰에서는 위험할 정도로 크게 들릴 수 있습니다.</string>
     <string name="convert_for_limited_dac">저사양 DAC에 맞게 변환</string>
     <string name="convert_for_limited_dac_subtitle">DAC 한도를 넘는 트랙을 DAC의 최고 포맷으로 변환합니다. 트랙 시작이 더 오래 걸릴 수 있으며 원본 대비 비트 퍼펙트가 아닙니다.</string>
-    <string name="bit_perfect_confirm_title">비트 퍼펙트 출력을 켤까요?</string>
-    <string name="bit_perfect_confirm_message">DAC에 음악이 최대 레벨로 전달되며 휴대전화의 음량 버튼이 작동하지 않을 수 있습니다. 재생하기 전에 DAC나 앰프의 음량을 낮추세요.</string>
+    <string name="bit_perfect_confirm_title">독점 출력을 켤까요?</string>
+    <string name="bit_perfect_confirm_message">첫 재생 전에 이어폰을 빼고 실제 음량을 확인하세요. 직접 USB는 낮은 소프트웨어 음량으로 시작합니다. 다른 모드는 DAC 음량에 의존할 수 있습니다.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d비트</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d비트 · DAC 최대치, 이 트랙의 포맷에서 변환됨</string>
     <string name="bit_perfect_status_inexact">%1$s · 정확하지 않음: 이 소스는 무손실 PCM이 아닙니다</string>
@@ -1316,4 +1316,22 @@
     <string name="diwali_title">BitChord가 행복한 디왈리를 기원합니다</string>
     <string name="diwali_subtitle">빛의 축제가 여러분의 집을 기쁨으로, 매일을 음악으로 가득 채우길 바랍니다.</string>
     <string name="diwali_cta">함께 축하해요</string>
+    <string name="usb_direct_volume_mode" formatted="false">USB 직접 연결 음량 모드</string>
+    <string name="usb_volume_auto" formatted="false">자동</string>
+    <string name="usb_volume_hardware" formatted="false">하드웨어 음량</string>
+    <string name="usb_volume_software" formatted="false">안전 소프트웨어 음량</string>
+    <string name="usb_volume_mode_description" formatted="false">자동은 소프트웨어 음량을 사용합니다. 제어 기능을 확인한 DAC에서만 하드웨어를 사용하세요.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">새 USB 세션은 -40 dB 이하로 시작하며 0%는 무음입니다. 백분율은 청력 안전 한계가 아닙니다.</string>
+    <string name="usb_high_volume_title" formatted="false">더 높은 USB 음량을 허용할까요?</string>
+    <string name="usb_high_volume_warning" formatted="false">-20 dB를 넘으면 소리가 매우 클 수 있습니다. 음량을 높이기 전에 이어폰을 빼세요. 이 USB 세션에서 높은 음량을 허용할 뿐 안전한 소리 크기를 보장하지 않습니다.</string>
+    <string name="usb_high_volume_allow" formatted="false">이해했습니다</string>
+    <string name="usb_hardware_volume_warning" formatted="false">하드웨어 정보가 틀릴 수 있습니다. Bunny DSP나 확인하지 않은 기기에는 소프트웨어를 사용하세요. 하드웨어 테스트 전에 이어폰을 빼세요. 실패하면 소프트웨어 음량을 사용하거나 재생을 멈춥니다.</string>
+    <string name="bit_perfect_status_software">%1$s · 독점 USB · 소프트웨어 음량 %2$s dB</string>
+    <string name="usb_direct_stopped">USB 재생이 중지되었습니다. DAC와 USB 권한을 확인하거나 다른 출력을 선택한 후 다시 재생하세요.</string>
+    <string name="bit_perfect_unavailable_no_usb">USB DAC를 연결하세요. 직접 USB가 방금 장치를 해제했다면 Android가 오디오 경로를 다시 연결할 때까지 기다리세요.</string>
+    <string name="bit_perfect_unavailable_no_wired">이 모드에는 내장 DAC의 유선 헤드폰 또는 라인 출력이 필요합니다. USB 이어폰은 USB DAC 모드를 사용하세요.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android가 이 DAC에 사용 가능한 비트 퍼펙트 USB 믹서를 제공하지 않습니다. Android 14만으로는 지원이 보장되지 않습니다.</string>
+    <string name="bit_perfect_unavailable_permission">USB 권한이 필요합니다. 직접 USB를 선택하고 시스템 요청을 승인하세요.</string>
+    <string name="bit_perfect_unavailable_format">이 곡에 호환되는 독점 형식이 없습니다. 다른 출력을 선택하여 계속하세요.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android가 유선 출력의 진정한 AAudio 독점 재생을 거부했습니다.</string>
 </resources>

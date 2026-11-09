@@ -1472,16 +1472,16 @@
     <string name="font_footer">Klasyczna przywraca grubszą i ciaśniejszą czcionkę, której aplikacja używała przed dopasowaniem do Apple Music.</string>
     <string name="bit_perfect_output">Wyjście bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">Wyjście bit-perfect jest gotowe, więc wyszarzone ustawienia są pomijane, a wersje Dolby Atmos nie są pobierane. Zadziałają ponownie po odłączeniu DAC lub wyłączeniu trybu.</string>
-    <string name="bit_perfect_sheet_warning">Wysyła utwór do DAC bez zmian. Equalizer, normalizacja głośności, crossfade, Automix, szybkość odtwarzania i głośność BitChord są pomijane.</string>
+    <string name="bit_perfect_sheet_warning">Wyjście wyłączne omija efekty, normalizację, przenikanie i szybkość. Bezpośrednie USB obsługuje głośność programową; skalowane próbki nie są bit-perfect.</string>
     <string name="bit_perfect_mode_off_subtitle">Dźwięk przechodzi przez mikser Androida i efekty BitChord.</string>
-    <string name="bit_perfect_mode_usb_android">DAC USB</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 otwiera DAC z częstotliwością i głębią bitową każdego utworu, bez miksowania i resamplingu.</string>
+    <string name="bit_perfect_mode_usb_android">DAC USB (natywna ścieżka Androida)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Wymaga Androida 14+ i obsługi USB bit-perfect przez telefon. Android może nie udostępniać tego trybu dla podłączonego DAC.</string>
     <string name="bit_perfect_requires_android_14">Wymaga Androida 14 lub nowszego</string>
     <string name="bit_perfect_mode_dap_exclusive">Wbudowany DAC (AAudio na wyłączność)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">Do odtwarzaczy muzyki z własnym DAC. Otwiera wyjście słuchawkowe lub liniowe na wyłączność z częstotliwością każdego utworu. Nie każde urządzenie udostępnia tryb wyłączny.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Dla wbudowanego przewodowego wyjścia słuchawkowego lub liniowego, nie słuchawek USB. Android musi przyznać tryb wyłączny; wiele telefonów tego nie robi.</string>
     <string name="bit_perfect_requires_android_8_1">Wymaga Androida 8.1 lub nowszego</string>
     <string name="bit_perfect_mode_usb_direct">DAC USB (sterownik bezpośredni)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord sam obsługuje DAC, w każdej wersji Androida, i ustawia głośność na DAC. Prosi o uprawnienia USB. Może grać znacznie głośniej niż zwykłe wyjście.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">Tryb automatyczny używa głośności programowej. Sprzętowej używaj tylko po sprawdzeniu działania regulatora.</string>
     <string name="dac_volume">Głośność DAC</string>
     <string name="dac_volume_subtitle">Ustawiana na samym DAC; muzyka nie jest skalowana</string>
     <string name="usb_allow_fixed_volume">Zezwalaj na DAC bez regulacji głośności</string>
@@ -1490,8 +1490,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord nie może ustawić głośności tego typu DAC, więc gra on w pełnej skali, a głośność reguluje tylko jego własne pokrętło, jeśli je ma. Na czułych słuchawkach może to być niebezpiecznie głośne.</string>
     <string name="convert_for_limited_dac">Konwertuj dla słabszych DAC</string>
     <string name="convert_for_limited_dac_subtitle">Konwertuje utwory powyżej limitu Twojego DAC do jego najwyższego formatu. Utwory mogą uruchamiać się dłużej i nie będą bit-perfect względem oryginału.</string>
-    <string name="bit_perfect_confirm_title">Włączyć wyjście bit-perfect?</string>
-    <string name="bit_perfect_confirm_message">DAC otrzymuje muzykę w pełnej skali, a przyciski głośności telefonu mogą przestać działać. Przed odtwarzaniem ścisz DAC lub wzmacniacz.</string>
+    <string name="bit_perfect_confirm_title">Włączyć wyjście wyłączne?</string>
+    <string name="bit_perfect_confirm_message">Przed pierwszym odtwarzaniem wyjmij słuchawki i sprawdź poziom. Bezpośrednie USB startuje z niską głośnością programową. Inne tryby mogą zależeć od głośności DAC.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d bitów</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d bitów · maksimum DAC, przekonwertowano z formatu tego utworu</string>
     <string name="bit_perfect_status_inexact">%1$s · niedokładne: to źródło nie jest bezstratnym PCM</string>
@@ -1506,4 +1506,22 @@
     <string name="diwali_title">BitChord życzy Ci radosnego Diwali</string>
     <string name="diwali_subtitle">Niech to święto świateł wypełni Twój dom radością, a każdy dzień muzyką.</string>
     <string name="diwali_cta">Świętujmy</string>
+    <string name="usb_direct_volume_mode" formatted="false">Tryb głośności bezpośredniego USB</string>
+    <string name="usb_volume_auto" formatted="false">Automatyczny</string>
+    <string name="usb_volume_hardware" formatted="false">Głośność sprzętowa</string>
+    <string name="usb_volume_software" formatted="false">Bezpieczna głośność programowa</string>
+    <string name="usb_volume_mode_description" formatted="false">Tryb automatyczny używa głośności programowej. Sprzętowej używaj tylko po sprawdzeniu działania regulatora.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">Nowe sesje USB zaczynają od -40 dB lub ciszej; 0% wycisza. Procent nie określa bezpiecznej głośności.</string>
+    <string name="usb_high_volume_title" formatted="false">Zezwolić na większą głośność USB?</string>
+    <string name="usb_high_volume_warning" formatted="false">Poziomy powyżej -20 dB mogą być bardzo głośne. Wyjmij słuchawki przed zwiększeniem głośności. Zgoda dotyczy tej sesji USB i nie oznacza bezpiecznego poziomu dźwięku.</string>
+    <string name="usb_high_volume_allow" formatted="false">Rozumiem</string>
+    <string name="usb_hardware_volume_warning" formatted="false">Dane sprzętu mogą być błędne. Dla Bunny DSP lub niepewnych urządzeń używaj regulacji programowej. Przed testem sprzętu wyjmij słuchawki. W razie błędu zostanie użyta regulacja programowa lub odtwarzanie się zatrzyma.</string>
+    <string name="bit_perfect_status_software">%1$s · wyłączne USB · głośność programowa %2$s dB</string>
+    <string name="usb_direct_stopped">Odtwarzanie USB zostało zatrzymane. Sprawdź DAC i uprawnienie USB lub wybierz inne wyjście przed ponownym odtwarzaniem.</string>
+    <string name="bit_perfect_unavailable_no_usb">Podłącz DAC USB. Jeśli Direct USB właśnie go zwolnił, poczekaj, aż Android przywróci trasę dźwięku.</string>
+    <string name="bit_perfect_unavailable_no_wired">Ten tryb wymaga wbudowanego przewodowego wyjścia słuchawkowego lub liniowego. Słuchawki USB używają trybu DAC USB.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android nie udostępnia dla tego DAC użytecznego miksera USB bit-perfect. Sam Android 14 nie gwarantuje obsługi.</string>
+    <string name="bit_perfect_unavailable_permission">Wymagane jest uprawnienie USB. Wybierz bezpośrednie USB i zaakceptuj prośbę systemu.</string>
+    <string name="bit_perfect_unavailable_format">Brak zgodnego formatu wyłącznego dla tego utworu. Wybierz inne wyjście, aby kontynuować.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android odmówił prawdziwie wyłącznego odtwarzania AAudio na wyjściu przewodowym.</string>
 </resources>

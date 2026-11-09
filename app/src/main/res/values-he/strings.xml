@@ -1437,16 +1437,16 @@
     <string name="font_footer">האפשרות קלאסי מחזירה את הגופן העבה והצפוף יותר שהאפליקציה השתמשה בו לפני שהותאמה ל-Apple Music.</string>
     <string name="bit_perfect_output">פלט Bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">פלט Bit-perfect מוכן, ולכן ההגדרות המעומעמות אינן פעילות ולא מתבקשות גרסאות Dolby Atmos. הן יפעלו שוב כשה-DAC ינותק או כשהמצב ייכבה.</string>
-    <string name="bit_perfect_sheet_warning">שולח את הרצועה ל-DAC ללא שינוי. האקולייזר, נרמול העוצמה, ה-Crossfade, ה-Automix, מהירות ההשמעה ועוצמת הקול של BitChord אינם פעילים.</string>
+    <string name="bit_perfect_sheet_warning">פלט בלעדי עוקף אפקטים, נרמול, מעברים ומהירות. USB ישיר יכול להשתמש בעוצמת תוכנה; דגימות ששונו אינן bit-perfect.</string>
     <string name="bit_perfect_mode_off_subtitle">השמע עובר דרך המיקסר של Android והאפקטים של BitChord.</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 פותח את ה-DAC בקצב ובעומק הסיביות של כל רצועה, ללא מיקס וללא דגימה מחדש.</string>
+    <string name="bit_perfect_mode_usb_android">ממיר USB (נתיב Android מקורי)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">נדרשים Android 14 ומעלה ותמיכת USB bit-perfect בטלפון. ייתכן ש־Android לא מציע מצב זה לממיר המחובר.</string>
     <string name="bit_perfect_requires_android_14">נדרש Android 14 ומעלה</string>
     <string name="bit_perfect_mode_dap_exclusive">DAC מובנה (AAudio בלעדי)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">לנגני מוזיקה עם DAC משלהם. פותח את יציאת האוזניות או הקו באופן בלעדי בקצב של כל רצועה. לא כל מכשיר מאפשר מצב בלעדי.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">ליציאת אוזניות או קו קווית מובנית, לא לאוזניות USB. Android חייב לאשר מצב בלעדי; טלפונים רבים אינם מאפשרים זאת.</string>
     <string name="bit_perfect_requires_android_8_1">נדרש Android 8.1 ומעלה</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC (מנהל התקן ישיר)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord מפעיל את ה-DAC בעצמו, בכל גרסת Android, וקובע את עוצמת הקול ב-DAC. מבקש הרשאת USB. עשוי להישמע חזק בהרבה מהפלט הרגיל.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">מצב אוטומטי משתמש בעוצמת תוכנה. יש להשתמש בחומרה רק לאחר אימות הבקרה בממיר.</string>
     <string name="dac_volume">עוצמת קול של ה-DAC</string>
     <string name="dac_volume_subtitle">נקבעת ב-DAC עצמו; המוזיקה אינה משתנה</string>
     <string name="usb_allow_fixed_volume">אפשר רכיבי DAC ללא בקרת עוצמה</string>
@@ -1455,8 +1455,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord לא יכול לקבוע את עוצמת הקול של DAC מסוג זה, ולכן הוא מנגן בעוצמה מלאה ורק הכפתור שלו עצמו, אם יש כזה, שולט בעוצמה. הצליל עלול להיות חזק באופן מסוכן עם אוזניות רגישות.</string>
     <string name="convert_for_limited_dac">המרה לרכיבי DAC מוגבלים</string>
     <string name="convert_for_limited_dac_subtitle">ממיר רצועות שמעל למגבלת ה-DAC שלך לפורמט הגבוה ביותר שלו. ייתכן שהרצועות יתחילו לאט יותר, והן לא יהיו Bit-perfect ביחס למקור.</string>
-    <string name="bit_perfect_confirm_title">להפעיל פלט Bit-perfect?</string>
-    <string name="bit_perfect_confirm_message">ה-DAC מקבל את המוזיקה בעוצמה מלאה, וייתכן שכפתורי עוצמת הקול של הטלפון יפסיקו לעבוד. יש להנמיך את ה-DAC או המגבר לפני ההשמעה.</string>
+    <string name="bit_perfect_confirm_title">להפעיל פלט בלעדי?</string>
+    <string name="bit_perfect_confirm_message">יש להסיר את האוזניות לפני הניגון הראשון ולבדוק את העוצמה בפועל. USB ישיר מתחיל בעוצמת תוכנה נמוכה. מצבים אחרים עשויים להיות תלויים בעוצמת הממיר.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-bit</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d-bit · מקסימום ה-DAC, הומר מהפורמט של הרצועה</string>
     <string name="bit_perfect_status_inexact">%1$s · לא מדויק: המקור הזה אינו PCM ללא אובדן</string>
@@ -1471,4 +1471,22 @@
     <string name="diwali_title">BitChord מאחל לך דיוואלי שמח</string>
     <string name="diwali_subtitle">מי ייתן וחג האורות הזה ימלא את ביתך בשמחה ואת ימיך במוזיקה.</string>
     <string name="diwali_cta">בואו נחגוג</string>
+    <string name="usb_direct_volume_mode" formatted="false">מצב עוצמת USB ישיר</string>
+    <string name="usb_volume_auto" formatted="false">אוטומטי</string>
+    <string name="usb_volume_hardware" formatted="false">עוצמת חומרה</string>
+    <string name="usb_volume_software" formatted="false">עוצמת תוכנה בטוחה</string>
+    <string name="usb_volume_mode_description" formatted="false">מצב אוטומטי משתמש בעוצמת תוכנה. יש להשתמש בחומרה רק לאחר אימות הבקרה בממיר.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">הפעלות USB חדשות מתחילות ב־-40 dB או פחות; 0% משתיק. האחוז אינו סף בטיחות לשמיעה.</string>
+    <string name="usb_high_volume_title" formatted="false">לאפשר עוצמת USB גבוהה יותר?</string>
+    <string name="usb_high_volume_warning" formatted="false">רמות מעל -20 dB עלולות להיות חזקות מאוד. יש להסיר את האוזניות לפני ההגברה. האישור מאפשר רמות גבוהות יותר בהפעלה זו ואינו מבטיח עוצמה בטוחה.</string>
+    <string name="usb_high_volume_allow" formatted="false">הבנתי</string>
+    <string name="usb_hardware_volume_warning" formatted="false">דיווחי החומרה עשויים להיות שגויים. ב־Bunny DSP או במכשירים לא מאומתים יש להשתמש בתוכנה. יש להסיר אוזניות לפני בדיקת חומרה. בכשל תופעל עוצמת תוכנה או שהניגון ייעצר.</string>
+    <string name="bit_perfect_status_software">%1$s · USB בלעדי · עוצמת תוכנה %2$s dB</string>
+    <string name="usb_direct_stopped">ניגון ה־USB הופסק. יש לבדוק את הממיר ואת הרשאת ה־USB, או לבחור פלט אחר לפני הפעלה חוזרת.</string>
+    <string name="bit_perfect_unavailable_no_usb">יש לחבר ממיר USB. אם USB ישיר שחרר אותו זה עתה, יש להמתין לחיבור מחדש של נתיב השמע ב־Android.</string>
+    <string name="bit_perfect_unavailable_no_wired">מצב זה דורש יציאת אוזניות או קו קווית מובנית. אוזניות USB משתמשות במצב ממיר USB.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android אינו מציע מיקסר USB bit-perfect שמיש לממיר זה. Android 14 לבדו אינו מבטיח תמיכה.</string>
+    <string name="bit_perfect_unavailable_permission">נדרשת הרשאת USB. יש לבחור USB ישיר ולאשר את בקשת המערכת.</string>
+    <string name="bit_perfect_unavailable_format">אין פורמט בלעדי תואם לרצועה זו. יש לבחור פלט אחר כדי להמשיך.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android סירב לניגון AAudio בלעדי אמיתי ביציאה הקווית.</string>
 </resources>

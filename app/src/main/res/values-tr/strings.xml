@@ -1389,16 +1389,16 @@
     <string name="font_footer">Eski, uygulamanın Apple Music\'e uyarlanmadan önce kullandığı daha kalın ve sıkı yazı tipini geri getirir.</string>
     <string name="bit_perfect_output">Bit-perfect çıkış</string>
     <string name="bit_perfect_bypassed_footer">Bit-perfect çıkış hazır, bu nedenle soluk ayarlar atlanır ve Dolby Atmos sürümleri istenmez. DAC çıkarıldığında veya mod kapatıldığında yeniden çalışırlar.</string>
-    <string name="bit_perfect_sheet_warning">Parçayı DAC\'a değiştirmeden gönderir. Ekolayzır, ses yüksekliği normalleştirme, çapraz geçiş, Automix, çalma hızı ve BitChord\'un ses düzeyi atlanır.</string>
+    <string name="bit_perfect_sheet_warning">Özel çıkış efektleri, normalleştirmeyi, geçişleri ve hızı atlar. Doğrudan USB yazılım sesi uygulayabilir; ölçeklenen örnekler bit-perfect değildir.</string>
     <string name="bit_perfect_mode_off_subtitle">Ses, Android\'in mikseri ve BitChord\'un efektlerinden geçer.</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14, DAC\'ı her parçanın kendi hızında ve bit derinliğinde, miksleme veya yeniden örnekleme olmadan açar.</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC (Android yerel yolu)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Android 14+ ve telefonda bit-perfect USB desteği gerekir. Android bağlı DAC için bu modu sunmayabilir.</string>
     <string name="bit_perfect_requires_android_14">Android 14 veya üstü gerekir</string>
     <string name="bit_perfect_mode_dap_exclusive">Dahili DAC (AAudio özel)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">Kendi DAC\'ı olan müzik çalarlar için. Kulaklık veya hat çıkışını her parçanın kendi hızında özel olarak açar. Her cihaz özel moda izin vermez.</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">Dahili kablolu kulaklık veya hat çıkışı içindir, USB kulaklıklar için değildir. Android özel moda izin vermelidir; birçok telefon vermez.</string>
     <string name="bit_perfect_requires_android_8_1">Android 8.1 veya üstü gerekir</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC (doğrudan sürücü)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord, DAC\'ı her Android sürümünde kendisi yönetir ve ses düzeyini DAC üzerinde ayarlar. USB izni ister. Normal çıkıştan çok daha yüksek ses verebilir.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">Otomatik, yazılım sesini kullanır. Donanımı yalnızca DAC kontrollerini doğruladıysanız kullanın.</string>
     <string name="dac_volume">DAC ses düzeyi</string>
     <string name="dac_volume_subtitle">DAC\'ın kendisinde ayarlanır; müzik ölçeklenmez</string>
     <string name="usb_allow_fixed_volume">Ses kontrolü olmayan DAC\'lara izin ver</string>
@@ -1407,8 +1407,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord bu tür bir DAC\'ın ses düzeyini ayarlayamaz, bu yüzden tam ölçekte çalar ve yalnızca varsa DAC\'ın kendi düğmesi ses düzeyini denetler. Hassas kulaklıklarla tehlikeli derecede yüksek olabilir.</string>
     <string name="convert_for_limited_dac">Düşük özellikli DAC\'lar için dönüştür</string>
     <string name="convert_for_limited_dac_subtitle">DAC\'ınızın sınırını aşan parçaları en yüksek biçimine dönüştürür. Parçaların başlaması daha uzun sürebilir ve özgün kayda göre bit-perfect olmaz.</string>
-    <string name="bit_perfect_confirm_title">Bit-perfect çıkış açılsın mı?</string>
-    <string name="bit_perfect_confirm_message">DAC müziği tam ölçekte alır ve telefonun ses düğmeleri çalışmayabilir. Çalmadan önce DAC\'ın veya amfinin sesini kısın.</string>
+    <string name="bit_perfect_confirm_title">Özel çıkış etkinleştirilsin mi?</string>
+    <string name="bit_perfect_confirm_message">İlk çalmadan önce kulaklıkları çıkarın ve gerçek seviyeyi doğrulayın. Doğrudan USB düşük yazılım sesiyle başlar. Diğer modlar DAC sesine bağlı olabilir.</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d bit</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d bit · DAC üst sınırı, bu parçanın biçiminden dönüştürüldü</string>
     <string name="bit_perfect_status_inexact">%1$s · tam değil: bu kaynak kayıpsız PCM değil</string>
@@ -1423,4 +1423,22 @@
     <string name="diwali_title">BitChord mutlu bir Diwali diler</string>
     <string name="diwali_subtitle">Bu ışık festivali evinizi neşeyle, günlerinizi müzikle doldursun.</string>
     <string name="diwali_cta">Birlikte kutlayalım</string>
+    <string name="usb_direct_volume_mode" formatted="false">Doğrudan USB ses modu</string>
+    <string name="usb_volume_auto" formatted="false">Otomatik</string>
+    <string name="usb_volume_hardware" formatted="false">Donanım sesi</string>
+    <string name="usb_volume_software" formatted="false">Güvenli yazılım sesi</string>
+    <string name="usb_volume_mode_description" formatted="false">Otomatik, yazılım sesini kullanır. Donanımı yalnızca DAC kontrollerini doğruladıysanız kullanın.</string>
+    <string name="usb_software_volume_subtitle" formatted="false">Yeni USB oturumları -40 dB veya altında başlar; 0% sessizdir. Yüzde, işitme güvenliği sınırı değildir.</string>
+    <string name="usb_high_volume_title" formatted="false">Daha yüksek USB sesine izin verilsin mi?</string>
+    <string name="usb_high_volume_warning" formatted="false">-20 dB üzeri çok yüksek olabilir. Sesi artırmadan önce kulaklıkları çıkarın. Bu, USB oturumu için daha yüksek seviyelere izin verir; güvenli ses düzeyini garanti etmez.</string>
+    <string name="usb_high_volume_allow" formatted="false">Anladım</string>
+    <string name="usb_hardware_volume_warning" formatted="false">Donanım bilgileri yanlış olabilir. Bunny DSP veya doğrulanmamış cihazlarda yazılım kullanın. Donanımı denemeden önce kulaklıkları çıkarın. Hata olursa yazılım kullanılır veya çalma durur.</string>
+    <string name="bit_perfect_status_software">%1$s · özel USB · yazılım sesi %2$s dB</string>
+    <string name="usb_direct_stopped">USB çalma durduruldu. Tekrar çalmadan önce DAC ve USB iznini kontrol edin veya başka bir çıkış seçin.</string>
+    <string name="bit_perfect_unavailable_no_usb">Bir USB DAC bağlayın. Doğrudan USB az önce bıraktıysa Android ses yolunu yeniden bağlayana kadar bekleyin.</string>
+    <string name="bit_perfect_unavailable_no_wired">Bu mod dahili kablolu kulaklık veya hat çıkışı gerektirir. USB kulaklıklar USB DAC modunu kullanır.</string>
+    <string name="bit_perfect_unavailable_native_usb">Android bu DAC için kullanılabilir bir bit-perfect USB mikseri sunmuyor. Yalnızca Android 14 olması desteği garanti etmez.</string>
+    <string name="bit_perfect_unavailable_permission">USB izni gereklidir. Doğrudan USB seçip sistem isteğini onaylayın.</string>
+    <string name="bit_perfect_unavailable_format">Bu parça için uyumlu özel format yok. Devam etmek için başka bir çıkış seçin.</string>
+    <string name="bit_perfect_unavailable_exclusive">Android kablolu çıkışta gerçek AAudio özel çalmayı reddetti.</string>
 </resources>

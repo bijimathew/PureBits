@@ -1432,16 +1432,16 @@
     <string name="font_footer">पुराना विकल्प वह मोटा और सटा हुआ फ़ॉन्ट वापस लाता है जो ऐप Apple Music से मिलाए जाने से पहले इस्तेमाल करता था।</string>
     <string name="bit_perfect_output">बिट-परफ़ेक्ट आउटपुट</string>
     <string name="bit_perfect_bypassed_footer">बिट-परफ़ेक्ट आउटपुट तैयार है, इसलिए धुंधली सेटिंग्स बायपास हैं और Dolby Atmos वर्शन नहीं माँगे जाते। DAC डिस्कनेक्ट होने या मोड बंद होने पर ये फिर से काम करेंगी।</string>
-    <string name="bit_perfect_sheet_warning">ट्रैक को बिना बदलाव DAC पर भेजता है। इक्वलाइज़र, लाउडनेस नॉर्मलाइज़ेशन, क्रॉसफ़ेड, ऑटोमिक्स, प्लेबैक स्पीड और BitChord का वॉल्यूम बायपास हो जाते हैं।</string>
+    <string name="bit_perfect_sheet_warning">एक्सक्लूसिव आउटपुट इफ़ेक्ट, सामान्यीकरण, क्रॉसफ़ेड और गति को बायपास करता है। डायरेक्ट USB सॉफ़्टवेयर वॉल्यूम लगा सकता है; बदले हुए सैंपल बिट-परफ़ेक्ट नहीं हैं।</string>
     <string name="bit_perfect_mode_off_subtitle">ऑडियो Android के मिक्सर और BitChord के इफ़ेक्ट से होकर जाता है।</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 हर ट्रैक के अपने रेट और बिट डेप्थ पर DAC खोलता है, बिना मिक्सिंग या रीसैंपलिंग के।</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC (Android नेटिव पथ)</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Android 14+ और फ़ोन में बिट-परफ़ेक्ट USB समर्थन चाहिए। जुड़े DAC के लिए Android यह मोड उपलब्ध न कराए।</string>
     <string name="bit_perfect_requires_android_14">Android 14 या उसके बाद का वर्शन चाहिए</string>
     <string name="bit_perfect_mode_dap_exclusive">बिल्ट-इन DAC (AAudio एक्सक्लूसिव)</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">अपने DAC वाले म्यूज़िक प्लेयर के लिए। हर ट्रैक के अपने रेट पर हेडफ़ोन या लाइन आउटपुट को एक्सक्लूसिव रूप से खोलता है। हर डिवाइस एक्सक्लूसिव मोड नहीं देता।</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">बिल्ट-इन वायर्ड हेडफ़ोन या लाइन आउटपुट के लिए, USB इयरफ़ोन के लिए नहीं। Android को एक्सक्लूसिव मोड देना होगा; कई फ़ोन नहीं देते।</string>
     <string name="bit_perfect_requires_android_8_1">Android 8.1 या उसके बाद का वर्शन चाहिए</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC (डायरेक्ट ड्राइवर)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord किसी भी Android वर्शन पर DAC को खुद चलाता है और वॉल्यूम DAC पर ही सेट करता है। USB अनुमति माँगता है। सामान्य आउटपुट से काफ़ी तेज़ हो सकता है।</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">स्वचालित मोड सॉफ़्टवेयर वॉल्यूम उपयोग करता है। हार्डवेयर केवल तभी चुनें जब उसके नियंत्रण जाँचे हों।</string>
     <string name="dac_volume">DAC वॉल्यूम</string>
     <string name="dac_volume_subtitle">DAC पर ही सेट होता है; म्यूज़िक को स्केल नहीं किया जाता</string>
     <string name="usb_allow_fixed_volume">बिना वॉल्यूम कंट्रोल वाले DAC की अनुमति दें</string>
@@ -1450,8 +1450,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord इस तरह के DAC का वॉल्यूम सेट नहीं कर सकता, इसलिए यह फ़ुल स्केल पर चलता है और सिर्फ़ DAC का अपना नॉब, अगर हो, आवाज़ नियंत्रित करता है। संवेदनशील हेडफ़ोन पर यह ख़तरनाक रूप से तेज़ हो सकता है।</string>
     <string name="convert_for_limited_dac">कम क्षमता वाले DAC के लिए बदलें</string>
     <string name="convert_for_limited_dac_subtitle">आपके DAC की सीमा से ऊपर के ट्रैक को उसके सबसे ऊँचे फ़ॉर्मैट में बदलता है। ट्रैक शुरू होने में ज़्यादा समय लग सकता है और वे मूल के मुकाबले बिट-परफ़ेक्ट नहीं होंगे।</string>
-    <string name="bit_perfect_confirm_title">बिट-परफ़ेक्ट आउटपुट चालू करें?</string>
-    <string name="bit_perfect_confirm_message">DAC को म्यूज़िक फ़ुल स्केल पर मिलता है, और फ़ोन के वॉल्यूम बटन काम करना बंद कर सकते हैं। चलाने से पहले DAC या एम्पलीफ़ायर की आवाज़ कम कर लें।</string>
+    <string name="bit_perfect_confirm_title">एक्सक्लूसिव आउटपुट चालू करें?</string>
+    <string name="bit_perfect_confirm_message">पहली बार चलाने से पहले इयरफ़ोन निकालें और वास्तविक स्तर जाँचें। डायरेक्ट USB कम सॉफ़्टवेयर वॉल्यूम से शुरू होता है। अन्य मोड DAC वॉल्यूम पर निर्भर हो सकते हैं।</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d-बिट</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d-बिट · DAC की अधिकतम सीमा, इस ट्रैक के फ़ॉर्मैट से बदला गया</string>
     <string name="bit_perfect_status_inexact">%1$s · सटीक नहीं: यह सोर्स लॉसलेस PCM नहीं है</string>
@@ -1466,4 +1466,22 @@
     <string name="next_addon_phone_only">जब गाना इसी फ़ोन पर चल रहा हो और कोई ट्रांज़िशन न हो, तब दूसरा स्रोत आज़माएँ।</string>
     <string name="next_addon_unknown_cache">पहले से कैश में मौजूद इस गाने में ऐडऑन की जानकारी नहीं है। ऑडियो कैश साफ़ करें, गाना फिर से चलाएँ और दोबारा कोशिश करें।</string>
     <string name="automix_overview">Automix का अवलोकन</string>
+    <string name="usb_direct_volume_mode" formatted="false">USB डायरेक्ट वॉल्यूम मोड</string>
+    <string name="usb_volume_auto" formatted="false">स्वचालित</string>
+    <string name="usb_volume_hardware" formatted="false">हार्डवेयर वॉल्यूम</string>
+    <string name="usb_volume_software" formatted="false">सुरक्षित सॉफ़्टवेयर वॉल्यूम</string>
+    <string name="usb_volume_mode_description" formatted="false">स्वचालित मोड सॉफ़्टवेयर वॉल्यूम उपयोग करता है। हार्डवेयर केवल तभी चुनें जब उसके नियंत्रण जाँचे हों।</string>
+    <string name="usb_software_volume_subtitle" formatted="false">नया USB सत्र -40 dB या उससे कम पर शुरू होता है; 0% मूक है। प्रतिशत सुनने की सुरक्षा सीमा नहीं है।</string>
+    <string name="usb_high_volume_title" formatted="false">अधिक USB वॉल्यूम की अनुमति दें?</string>
+    <string name="usb_high_volume_warning" formatted="false"> -20 dB से ऊपर ध्वनि बहुत तेज़ हो सकती है। वॉल्यूम बढ़ाने से पहले इयरफ़ोन निकालें। यह इस USB सत्र में ऊँचे स्तर की अनुमति है; सुरक्षित ध्वनि की पुष्टि नहीं।</string>
+    <string name="usb_high_volume_allow" formatted="false">मैं समझता हूँ</string>
+    <string name="usb_hardware_volume_warning" formatted="false">हार्डवेयर की जानकारी गलत हो सकती है। Bunny DSP या अनिश्चित उपकरण के लिए सॉफ़्टवेयर चुनें। हार्डवेयर जाँच से पहले इयरफ़ोन निकालें। विफल होने पर सॉफ़्टवेयर उपयोग होगा या प्लेबैक रुकेगा।</string>
+    <string name="bit_perfect_status_software">%1$s · एक्सक्लूसिव USB · सॉफ़्टवेयर वॉल्यूम %2$s dB</string>
+    <string name="usb_direct_stopped">USB प्लेबैक रुक गया। दोबारा चलाने से पहले DAC और USB अनुमति जाँचें, या दूसरा आउटपुट चुनें।</string>
+    <string name="bit_perfect_unavailable_no_usb">USB DAC जोड़ें। अगर डायरेक्ट USB ने उसे अभी छोड़ा है, तो Android के ऑडियो रूट दोबारा जोड़ने की प्रतीक्षा करें।</string>
+    <string name="bit_perfect_unavailable_no_wired">इस मोड के लिए बिल्ट-इन वायर्ड हेडफ़ोन या लाइन आउटपुट चाहिए। USB इयरफ़ोन USB DAC मोड उपयोग करते हैं।</string>
+    <string name="bit_perfect_unavailable_native_usb">Android इस DAC के लिए उपयोग योग्य बिट-परफ़ेक्ट USB मिक्सर नहीं देता। केवल Android 14 होना समर्थन की गारंटी नहीं है।</string>
+    <string name="bit_perfect_unavailable_permission">USB अनुमति चाहिए। डायरेक्ट USB चुनें और सिस्टम अनुरोध स्वीकार करें।</string>
+    <string name="bit_perfect_unavailable_format">इस गाने के लिए संगत एक्सक्लूसिव फ़ॉर्मैट उपलब्ध नहीं है। जारी रखने के लिए दूसरा आउटपुट चुनें।</string>
+    <string name="bit_perfect_unavailable_exclusive">Android ने वायर्ड आउटपुट पर वास्तविक AAudio एक्सक्लूसिव प्लेबैक अस्वीकार किया।</string>
 </resources>

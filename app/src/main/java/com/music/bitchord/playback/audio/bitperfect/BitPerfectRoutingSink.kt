@@ -30,9 +30,9 @@ import java.nio.ByteBuffer
  *
  * The choice is made per [configure], which Media3 calls for every new
  * format: a track the exclusive output can carry unchanged goes there, and
- * everything else — a lossy stream with encoder priming, a format the DAC
- * does not offer, any track while the mode is off — takes the [normal] path
- * exactly as before. With the mode off this class only forwards.
+ * other formats take the [normal] path except while direct USB is selected.
+ * Direct USB requires a supported format/device and fails closed; selecting a
+ * different output is an explicit user action.
  *
  * Switching sinks mid-playlist hands over cleanly. The outgoing sink plays
  * out what it holds before the incoming one writes a frame, because both end
@@ -40,9 +40,9 @@ import java.nio.ByteBuffer
  * track that is still playing through the shared mixer, or released from
  * under one that is not.
  *
- * If the exclusive output fails — it could not open, or the route changed
- * under it — the stream continues on [normal] from the next buffer rather
- * than surfacing a playback error. After the direct USB driver lets a DAC go,
+ * Non-USB exclusive failures can continue on [normal] from the next buffer.
+ * Direct USB failures stop instead of substituting another route's gain.
+ * After the direct USB driver lets a DAC go,
  * [normal] waits for Android to take it back, so nothing meant for the DAC
  * starts on the phone's speaker in between. Settings that both sinks must hold
  * (attributes, session, volume, listener) are always given to both, so
@@ -71,11 +71,24 @@ internal class BitPerfectRoutingSink(
                 bitPerfect.configure(audioSinkConfig)
                 bitPerfect
             } catch (error: AudioSink.ConfigurationException) {
+                if (bitPerfect.directUsbSelected()) {
+                    reset()
+                    throw AudioSink.ConfigurationException(DirectUsbSafetyException("Direct USB configuration rejected", error), audioSinkConfig.format)
+                }
                 Log.i(TAG, "Using normal output: ${error.message}")
                 normal.configure(audioSinkConfig)
                 normal
             }
         } else {
+            if (bitPerfect.directUsbSelected()) {
+                // Permission denial, missing device and unsupported formats all
+                // stay silent. Android's unrelated volume is never substituted.
+                reset()
+                throw AudioSink.ConfigurationException(
+                    DirectUsbSafetyException("Direct USB unavailable; choose another output to continue"),
+                    audioSinkConfig.format,
+                )
+            }
             normal.configure(audioSinkConfig)
             normal
         }
@@ -231,6 +244,11 @@ internal class BitPerfectRoutingSink(
 
     /** The exclusive output failed; the stream carries on through [normal]. */
     private fun fallBack(error: Exception) {
+        if (bitPerfect.requiresDirectUsb()) {
+            bitPerfect.reset()
+            normal.reset()
+            throw error
+        }
         Log.w(TAG, "Bit-perfect output failed; continuing on normal output", error)
         bitPerfect.reset()
         active = normal

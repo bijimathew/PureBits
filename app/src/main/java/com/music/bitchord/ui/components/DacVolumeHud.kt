@@ -31,6 +31,9 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeMute
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import android.view.KeyEvent
 import android.view.Window
 import androidx.compose.runtime.Composable
@@ -54,10 +57,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.R
 import com.music.bitchord.playback.audio.bitperfect.DacVolume
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -161,6 +166,22 @@ private val EDGE_GAP = 10.dp
 @Composable
 fun DacVolumeHud(hazeState: HazeState) {
     val level by DacVolume.level.collectAsStateWithLifecycle()
+    val highVolumeRequested by DacVolume.highVolumeRequested.collectAsStateWithLifecycle()
+    if (highVolumeRequested && level != null) {
+        AlertDialog(
+            onDismissRequest = DacVolume::dismissHighVolume,
+            title = { Text(stringResource(R.string.usb_high_volume_title)) },
+            text = { Text(stringResource(R.string.usb_high_volume_warning)) },
+            confirmButton = {
+                TextButton(onClick = DacVolume::confirmHighVolume) {
+                    Text(stringResource(R.string.usb_high_volume_allow))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = DacVolume::dismissHighVolume) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
     val current = level ?: return
 
     val haptics = LocalHapticFeedback.current

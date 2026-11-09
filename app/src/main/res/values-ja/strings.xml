@@ -1410,16 +1410,16 @@
     <string name="font_footer">「従来」では、Apple Music に合わせる前にアプリで使われていた、太めで詰まった書体に戻します。</string>
     <string name="bit_perfect_output">ビットパーフェクト出力</string>
     <string name="bit_perfect_bypassed_footer">ビットパーフェクト出力の準備ができているため、淡色表示の設定はバイパスされ、Dolby Atmos 版はリクエストされません。DAC を取り外すかモードをオフにすると、再び機能します。</string>
-    <string name="bit_perfect_sheet_warning">トラックを変更せずに DAC に送ります。イコライザー、音量の正規化、クロスフェード、オートミックス、再生速度、BitChord の音量はバイパスされます。</string>
+    <string name="bit_perfect_sheet_warning">排他出力はエフェクト、音量正規化、クロスフェード、再生速度をバイパスします。USBダイレクトのソフトウェア音量で変更されたサンプルはビットパーフェクトではありません。</string>
     <string name="bit_perfect_mode_off_subtitle">音声は Android のミキサーと BitChord のエフェクトを通ります。</string>
-    <string name="bit_perfect_mode_usb_android">USB DAC</string>
-    <string name="bit_perfect_mode_usb_android_subtitle">Android 14 が各トラックのサンプルレートとビット深度で DAC を開きます。ミキシングやリサンプリングは行いません。</string>
+    <string name="bit_perfect_mode_usb_android">USB DAC（Android標準経路）</string>
+    <string name="bit_perfect_mode_usb_android_subtitle">Android 14以降と端末のビットパーフェクトUSB対応が必要です。接続したDACでこのモードが提供されない場合があります。</string>
     <string name="bit_perfect_requires_android_14">Android 14 以降が必要です</string>
     <string name="bit_perfect_mode_dap_exclusive">内蔵 DAC（AAudio 排他）</string>
-    <string name="bit_perfect_mode_dap_exclusive_subtitle">独自の DAC を備えた音楽プレーヤー向けです。ヘッドホン出力またはライン出力を各トラックのサンプルレートで排他的に開きます。排他モードを許可しないデバイスもあります。</string>
+    <string name="bit_perfect_mode_dap_exclusive_subtitle">内蔵DACの有線ヘッドホンまたはライン出力用で、USBイヤホン用ではありません。Androidが排他モードを許可する必要があり、多くの端末では利用できません。</string>
     <string name="bit_perfect_requires_android_8_1">Android 8.1 以降が必要です</string>
     <string name="bit_perfect_mode_usb_direct">USB DAC（ダイレクトドライバー）</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">どの Android バージョンでも BitChord が DAC を直接制御し、音量は DAC 側で設定します。USB の権限を求めます。通常の出力よりかなり大きな音になることがあります。</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">自動ではソフトウェア音量を使用します。ハードウェアは音量制御を確認済みのDACでのみ使用してください。</string>
     <string name="dac_volume">DAC の音量</string>
     <string name="dac_volume_subtitle">DAC 本体で設定します。音楽データは変更されません</string>
     <string name="usb_allow_fixed_volume">音量調節のない DAC を許可</string>
@@ -1428,8 +1428,8 @@
     <string name="usb_allow_fixed_volume_confirm_message">BitChord はこの種の DAC の音量を設定できないため、フルスケールで再生され、DAC 自体のつまみ（ある場合）でのみ音量を調節できます。感度の高いヘッドホンでは危険なほど大きな音になることがあります。</string>
     <string name="convert_for_limited_dac">低スペック DAC 向けに変換</string>
     <string name="convert_for_limited_dac_subtitle">DAC の上限を超えるトラックを、DAC の最高フォーマットに変換します。再生開始に時間がかかることがあり、元の音源に対してビットパーフェクトにはなりません。</string>
-    <string name="bit_perfect_confirm_title">ビットパーフェクト出力をオンにしますか？</string>
-    <string name="bit_perfect_confirm_message">DAC にはフルスケールで音楽が送られ、スマートフォンの音量ボタンが機能しなくなることがあります。再生前に DAC またはアンプの音量を下げてください。</string>
+    <string name="bit_perfect_confirm_title">排他出力を有効にしますか？</string>
+    <string name="bit_perfect_confirm_message">初回再生前にイヤホンを外して実際の音量を確認してください。USBダイレクトは低いソフトウェア音量で開始します。他の排他モードではDACの音量に依存する場合があります。</string>
     <string name="bit_perfect_status_active">%1$s · %2$s kHz · %3$d ビット</string>
     <string name="bit_perfect_status_dac_limited">%1$s · %2$s kHz · %3$d ビット · DAC の最大値、このトラックの形式から変換</string>
     <string name="bit_perfect_status_inexact">%1$s · 正確ではありません： このソースはロスレス PCM ではありません</string>
@@ -1444,4 +1444,22 @@
     <string name="diwali_title">BitChordより、幸せなディーワーリーを</string>
     <string name="diwali_subtitle">光の祭りが、あなたの家を喜びで、毎日を音楽で満たしますように。</string>
     <string name="diwali_cta">お祝いしましょう</string>
+    <string name="usb_direct_volume_mode" formatted="false">USBダイレクト音量モード</string>
+    <string name="usb_volume_auto" formatted="false">自動</string>
+    <string name="usb_volume_hardware" formatted="false">ハードウェア音量</string>
+    <string name="usb_volume_software" formatted="false">安全重視のソフトウェア音量</string>
+    <string name="usb_volume_mode_description" formatted="false">自動ではソフトウェア音量を使用します。ハードウェアは音量制御を確認済みのDACでのみ使用してください。</string>
+    <string name="usb_software_volume_subtitle" formatted="false">新しいUSBセッションは-40 dB以下で開始し、0%は無音です。割合は聴覚の安全限界を示しません。</string>
+    <string name="usb_high_volume_title" formatted="false">USB音量をさらに上げますか？</string>
+    <string name="usb_high_volume_warning" formatted="false">-20 dBを超えると非常に大きな音になることがあります。音量を上げる前にイヤホンを外してください。このUSBセッションで高い音量を許可しますが、安全な音量を保証するものではありません。</string>
+    <string name="usb_high_volume_allow" formatted="false">理解しました</string>
+    <string name="usb_hardware_volume_warning" formatted="false">ハードウェアの情報は正確とは限りません。Bunny DSPや未確認の機器ではソフトウェアを使用してください。ハードウェアのテスト前にイヤホンを外してください。失敗時はソフトウェア音量に切り替えるか再生を停止します。</string>
+    <string name="bit_perfect_status_software">%1$s · 排他USB · ソフトウェア音量 %2$s dB</string>
+    <string name="usb_direct_stopped">USB再生が停止しました。DACとUSB権限を確認するか、別の出力を選んでから再生してください。</string>
+    <string name="bit_perfect_unavailable_no_usb">USB DACを接続してください。USBダイレクトが解放した直後なら、Androidが音声経路を再接続するまで待ってください。</string>
+    <string name="bit_perfect_unavailable_no_wired">このモードには内蔵DACの有線ヘッドホンまたはライン出力が必要です。USBイヤホンにはUSB DACモードを使用します。</string>
+    <string name="bit_perfect_unavailable_native_usb">AndroidはこのDACで利用できるビットパーフェクトUSBミキサーを提供していません。Android 14だけでは対応を保証できません。</string>
+    <string name="bit_perfect_unavailable_permission">USB権限が必要です。USBダイレクトを選び、システムの許可要求を承認してください。</string>
+    <string name="bit_perfect_unavailable_format">この曲で使用できる互換性のある排他形式がありません。別の出力を選んで続行してください。</string>
+    <string name="bit_perfect_unavailable_exclusive">Androidが有線出力での真のAAudio排他再生を拒否しました。</string>
 </resources>
