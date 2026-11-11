@@ -159,6 +159,40 @@ class DacFormatConverterTest {
         assertEquals(0, output.position())
     }
 
+    @Test
+    fun nonFiniteDecoderSamplesCannotBecomeFullScaleDuringDepthConversion() {
+        val input = ByteBuffer.allocateDirect(12).order(ByteOrder.LITTLE_ENDIAN)
+            .putFloat(Float.NaN).putFloat(Float.POSITIVE_INFINITY).putFloat(Float.NEGATIVE_INFINITY)
+        input.flip()
+        val output = ByteBuffer.allocateDirect(6).order(ByteOrder.LITTLE_ENDIAN)
+        val converter = DacFormatConverter(C.ENCODING_PCM_FLOAT, 1, 48_000, 48_000, 16, 16)
+        converter.process(input, output)
+        assertTrue(converter.drain(output))
+        output.flip()
+        repeat(3) { assertEquals(0, output.short.toInt()) }
+    }
+
+    @Test
+    fun nonFiniteDecoderSamplesCannotContaminateTheResamplingFilter() {
+        val input = ByteBuffer.allocateDirect(1024 * 4).order(ByteOrder.LITTLE_ENDIAN)
+        repeat(1024) { frame ->
+            input.putFloat(when (frame) {
+                200 -> Float.POSITIVE_INFINITY
+                400 -> Float.NEGATIVE_INFINITY
+                600 -> Float.NaN
+                else -> 0f
+            })
+        }
+        input.flip()
+        val output = ByteBuffer.allocateDirect(512 * 2).order(ByteOrder.LITTLE_ENDIAN)
+        val converter = DacFormatConverter(C.ENCODING_PCM_FLOAT, 1, 96_000, 48_000, 16, 16)
+        converter.process(input, output)
+        assertTrue(converter.drain(output))
+        assertEquals(1024, output.position())
+        output.flip()
+        repeat(512) { assertEquals("output frame $it", 0, output.short.toInt()) }
+    }
+
     // ---- Choosing the format --------------------------------------------------------------
 
     @Test

@@ -64,6 +64,33 @@ static void wireQueueHasATimeBudgetAcrossUsbIntervals() {
     }
 }
 
+static void interruptedEventPollingPreservesPendingAudioButDeviceErrorsStop() {
+    // Simulated event results: two signal interruptions must leave the same
+    // submitted audio pending until completion, rather than destroy the stream.
+    const int events[] = {kInterruptedEventPoll, kInterruptedEventPoll, 0};
+    bool pending = true;
+    bool stopped = false;
+    int completedFrames = 0;
+    for (int event : events) {
+        if (!eventPollMayContinue(event)) {
+            stopped = true;
+            break;
+        }
+        if (event == 0 && pending) {
+            completedFrames += 192;
+            pending = false;
+        }
+    }
+    EXPECT(!stopped);
+    EXPECT(!pending);
+    EXPECT(completedFrames == 192);
+
+    // All other public negative libusb errors must still fail closed. In
+    // particular, no-device, IO, timeout and memory failures are not EINTR.
+    const int fatalResults[] = {-1, -2, -3, -4, -5, -6, -7, -8, -9, -11, -12, -99};
+    for (int error : fatalResults) EXPECT(!eventPollMayContinue(error));
+}
+
 int main() {
     isolatedMissesDoNotEndAStream();
     sustainedLossStopsWithinTheMediaBudget();
@@ -71,5 +98,6 @@ int main() {
     flushStartsANewLossBudget();
     volumeLatencyQueueIsBoundedAndFrameAligned();
     wireQueueHasATimeBudgetAcrossUsbIntervals();
+    interruptedEventPollingPreservesPendingAudioButDeviceErrorsStop();
     return failures;
 }

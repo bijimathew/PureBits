@@ -73,7 +73,7 @@ internal interface BitPerfectTransport {
  * stay open.
  */
 internal enum class BitPerfectDriver(val label: String, val releasesWhenIdle: Boolean) {
-    ANDROID_MIXER("Android bit-perfect mixer", releasesWhenIdle = false),
+    ANDROID_MIXER("Android bit-perfect mixer", releasesWhenIdle = true),
     USB_DIRECT("Direct USB", releasesWhenIdle = true),
     AAUDIO_EXCLUSIVE("AAudio exclusive", releasesWhenIdle = true),
 }

@@ -2192,6 +2192,16 @@ private fun BitChordApp(
     val notifyPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* Refusing costs the progress notification, not the download. */ }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val storagePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->

@@ -841,6 +841,28 @@ class PlaybackService : MediaLibraryService() {
     private var lastPublishedSubtitle: String? = null
     private var lyricsTickerJob: Job? = null
 
+    /** Event-only diagnostics: distinguish focus/mute, buffering and native USB delivery failures. */
+    private fun logDirectUsbPlayback(event: String, active: ExoPlayer? = player) {
+        if (AppSettings.bitPerfectMode.value != BitPerfectMode.USB_DIRECT || active == null) return
+        val output = BitPerfectOutput.status.value
+        val state = when (active.playbackState) {
+            Player.STATE_IDLE -> "idle"
+            Player.STATE_BUFFERING -> "buffering"
+            Player.STATE_READY -> "ready"
+            Player.STATE_ENDED -> "ended"
+            else -> active.playbackState.toString()
+        }
+        TrackLog.d(
+            "AUDIO_OUT",
+            "USB player $event: state=$state playWhenReady=${active.playWhenReady} " +
+                "suppression=${active.playbackSuppressionReason} isPlaying=${active.isPlaying} " +
+                "playerVolume=${active.volume} softwareDb=${output.softwareVolumeDb} " +
+                "directActive=${output.active} positionMs=${active.currentPosition} " +
+                "bufferedPositionMs=${active.bufferedPosition} bufferedDurationMs=${active.totalBufferedDuration}",
+            about = active.currentMediaItem?.mediaId,
+        )
+    }
+
     /**
      * Everything the service books against the player it is currently on.
      *
@@ -859,6 +881,7 @@ class PlaybackService : MediaLibraryService() {
             // The player this fired on, which is by definition the one the
             // session is currently pointed at.
             val exoPlayer = player ?: return
+            logDirectUsbPlayback("isPlaying=$isPlaying", exoPlayer)
             // The only number that describes what a listener actually
             // waits through. Every other timing in this app measures one
             // leg of getting a track started — a resolve, a client walk, an
@@ -941,6 +964,7 @@ class PlaybackService : MediaLibraryService() {
          * on the audio, which is what the media notification shows too.
          */
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            logDirectUsbPlayback("playWhenReady=$playWhenReady reason=$reason")
             // Something started the phone's own player while a receiver is the
             // speaker — an internal path, since the session player's door
             // already sends a listener's play to the receiver. The phone goes
@@ -951,6 +975,16 @@ class PlaybackService : MediaLibraryService() {
             // pause the listener asked for from one another app imposed, and
             // [Player] does not keep the answer around to be asked later.
             partySync?.onPlayWhenReadyChanged(playWhenReady, reason)
+        }
+
+        override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+            logDirectUsbPlayback("suppressionChanged=$playbackSuppressionReason")
+        }
+
+        override fun onVolumeChanged(volume: Float) {
+            // ExoPlayer's public volume is separate from its internal focus multiplier;
+            // transport diagnostics record the final multiplier received by the sink.
+            logDirectUsbPlayback("volumeChanged=$volume")
         }
 
         /**
@@ -1052,6 +1086,7 @@ class PlaybackService : MediaLibraryService() {
             // The player this fired on, which is by definition the one the
             // session is currently pointed at.
             val exoPlayer = player ?: return
+            logDirectUsbPlayback("playbackStateChanged=$state", exoPlayer)
             if (state == Player.STATE_ENDED) {
                 SleepTimer.cancel()
                 // The queue ran dry, so no transition will ever close the last
@@ -2291,10 +2326,11 @@ class PlaybackService : MediaLibraryService() {
                 }
 
                 val standbyPlayer = spare
-                // Crossfade is unconditional: the setting that used to gate it
-                // is gone, so the only thing that can decline the fade is having
-                // no standby player to fade with.
+                // An exclusive DAC has one owner. Preparing a second real
+                // output can fail busy or take the DAC while the first is
+                // paused; use the same-player replacement below instead.
                 val canCrossfade = standbyPlayer != null &&
+                    AppSettings.bitPerfectMode.value == BitPerfectMode.OFF &&
                     (activePlayer.isPlaying || activePlayer.playbackState == Player.STATE_READY)
 
                 if (!canCrossfade || standbyPlayer == null) {
@@ -7268,6 +7304,15 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun requestOutputReconfiguration(rebuild: Boolean = false) {
+        if (!rebuild && AppSettings.bitPerfectMode.value == BitPerfectMode.USB_DIRECT) {
+            // Claiming/releasing USB can change Android's reported route and
+            // float capabilities. Those describe the normal sink, not direct
+            // USB. Rebuilding here loses transient focus suppression and can
+            // ask for focus again while a call/another app is using the DAC.
+            // Keep any explicit mode/device rebuild already queued intact.
+            applyOutputRoute()
+            return
+        }
         outputReconfigureJob?.cancel()
         outputReconfigureJob = scope.launch {
             // Replacing two renderers during a blend would cut one half of it.
@@ -7346,11 +7391,12 @@ class PlaybackService : MediaLibraryService() {
         newCrossfade.start()
         mediaSession?.player = newSessionPlayer(newActive, newCrossfade)
         applyOutputRoute()
-        if (items.isNotEmpty()) newActive.prepare()
-        newActive.playWhenReady = playWhenReady
-
+        // release() waits for the old playback thread: the replacement must
+        // not prepare/open an exclusive transport or request focus before this.
         oldActive.release()
         oldSpare.release()
+        if (items.isNotEmpty()) newActive.prepare()
+        newActive.playWhenReady = playWhenReady
         TrackLog.i(
             "AUDIO_OUT",
             "live output switch: ${if (enableFloat) "PCM_FLOAT" else "PCM_16BIT"}",
@@ -7990,6 +8036,11 @@ class PlaybackService : MediaLibraryService() {
         scope.launch {
             ListenBrainzManager.submitPlayingNow(lbToken, song, positionMs, durationMs, AppSettings.listenBrainzPrimaryArtistOnly.value)
         }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        return START_STICKY
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =

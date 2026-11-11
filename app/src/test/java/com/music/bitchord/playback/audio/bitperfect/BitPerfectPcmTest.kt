@@ -124,6 +124,18 @@ class BitPerfectPcmTest {
     }
 
     @Test
+    fun nonFiniteDecoderSamplesBecomeSilenceBeforeIntegerConversion() {
+        val input = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN)
+            .putFloat(Float.NaN).putFloat(Float.POSITIVE_INFINITY)
+            .putFloat(Float.NEGATIVE_INFINITY).putFloat(0.5f)
+        input.flip()
+        val (result, exact) = convert(input, C.ENCODING_PCM_FLOAT, 32)
+        assertFalse(exact)
+        repeat(3) { assertEquals(0, result.int) }
+        assertEquals(0x40000000, result.int)
+    }
+
+    @Test
     fun convertsOnlyWholeFramesThatFitTheOutput() {
         val input = ByteBuffer.allocate(10).order(ByteOrder.LITTLE_ENDIAN)
         repeat(5) { input.putShort(it.toShort()) }

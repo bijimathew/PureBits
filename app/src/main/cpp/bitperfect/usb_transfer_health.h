@@ -8,6 +8,15 @@
 
 namespace usbaudio {
 
+// libusb's public error value for an interrupted poll (POSIX EINTR). This is
+// not a failed audio transfer: preserve pending buffers and poll again. Every
+// other negative result remains fatal. Kept free of libusb for host tests;
+// the transport checks this constant against its pinned libusb header.
+constexpr int kInterruptedEventPoll = -10;
+inline bool eventPollMayContinue(int result) {
+    return result >= 0 || result == kInterruptedEventPoll;
+}
+
 // Keep at most 64 ms scheduled on the bus. A full-speed bInterval=4 endpoint
 // has one 8 ms packet per transfer, so it needs 8 slots rather than 16.
 inline int transferSlotCount(uint64_t transferDurationUs) {

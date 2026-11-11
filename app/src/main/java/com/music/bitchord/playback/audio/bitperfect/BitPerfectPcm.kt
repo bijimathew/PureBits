@@ -156,7 +156,9 @@ internal object BitPerfectPcm {
         2 -> input.short / 32_768.0
         3 -> read24(input, isBigEndian(encoding)) / 8_388_608.0
         else -> if (encoding == C.ENCODING_PCM_FLOAT) {
-            input.float.toDouble().takeUnless(Double::isNaN) ?: 0.0
+            // Sanitize before resampling: infinity otherwise contaminates the
+            // filter history and can turn into full-scale integer samples.
+            input.float.toDouble().takeIf(Double::isFinite) ?: 0.0
         } else {
             input.int / 2_147_483_648.0
         }
@@ -167,7 +169,8 @@ internal object BitPerfectPcm {
 
     /** The 24-bit integer a float sample stands for, clamped to range. */
     internal fun recover24(value: Float): Int {
-        if (value.isNaN()) return 0
+        // Invalid decoder samples are silence, never full-scale clipping.
+        if (!value.isFinite()) return 0
         val scaled = round(value.toDouble() * 0x7FFFFFFF / 256.0)
         return scaled.coerceIn(-8_388_608.0, 8_388_607.0).toInt()
     }

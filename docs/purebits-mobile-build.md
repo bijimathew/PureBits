@@ -32,6 +32,9 @@ shared-module tasks must not include `:tv`, `:wearos`, or `bundleWearApk` tasks.
 
 Direct USB software volume implementation, verification and hardware checks are
 documented in [the USB investigation](usb-direct-software-volume.md).
+The 2.1 background-silence report and diagnostic changes are covered in
+[the background investigation](usb-background-investigation.md), with a
+[GitHub engine comparison](audio-engine-references.md).
 
 The large Top Picks shelf is removed from Home. Recents keeps its compact layout
 and now starts below the header (or the sign-in banner when signed out).

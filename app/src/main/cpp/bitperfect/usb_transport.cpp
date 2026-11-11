@@ -30,6 +30,7 @@
 #include <sys/time.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -48,6 +49,7 @@
 #include "usb_pcm_queue.h"
 
 using namespace usbaudio;
+static_assert(kInterruptedEventPoll == LIBUSB_ERROR_INTERRUPTED, "libusb interrupted-poll value changed");
 
 namespace {
 void require(bool condition, const char *message) {
@@ -176,19 +178,31 @@ struct Slot {
         return missed ? TransferOutcome::PacketLoss : TransferOutcome::Complete;
     }
 
-    void logFailure(uint64_t count) const {
+    void logFailure(uint64_t count, bool fatal) const {
         // Rate-limit recurring packet loss. Never log audio bytes or device
         // serial numbers, and use transfer statuses rather than error codes.
-        if (count != 1 && count % 128 != 0) return;
+        if (!fatal && count != 1 && count % 128 != 0) return;
         int bad = 0;
+        int first = -1;
         for (int i = 0; i < transfer->num_iso_packets; ++i) {
             const auto &packet = transfer->iso_packet_desc[i];
-            if (packet.status != LIBUSB_TRANSFER_COMPLETED || packet.actual_length != packet.length) ++bad;
+            if (packet.status != LIBUSB_TRANSFER_COMPLETED || packet.actual_length != packet.length) {
+                ++bad;
+                if (first < 0) first = i;
+            }
         }
-        __android_log_print(ANDROID_LOG_WARN, "PureBitsUsb",
-                            "Audio transfer %s; %d/%d missed packets; failures=%llu",
-                            transferStatusName(transfer->status), bad, transfer->num_iso_packets,
-                            static_cast<unsigned long long>(count));
+        if (first >= 0) {
+            const auto &packet = transfer->iso_packet_desc[first];
+            __android_log_print(ANDROID_LOG_WARN, "PureBitsUsb",
+                                "Audio transfer %s; %d/%d missed packets; first=%d %s %u/%u bytes; failures=%llu",
+                                transferStatusName(transfer->status), bad, transfer->num_iso_packets,
+                                first, transferStatusName(packet.status), packet.actual_length, packet.length,
+                                static_cast<unsigned long long>(count));
+        } else {
+            __android_log_print(ANDROID_LOG_WARN, "PureBitsUsb",
+                                "Audio transfer %s; no packet failure reported; failures=%llu",
+                                transferStatusName(transfer->status), static_cast<unsigned long long>(count));
+        }
     }
 
     size_t actual() const { return transfer->iso_packet_desc[0].actual_length; }
@@ -311,7 +325,11 @@ public:
 
     void events() {
         timeval timeout{0, 1000};
-        check(libusb_handle_events_timeout(context, &timeout));
+        const int result = libusb_handle_events_timeout(context, &timeout);
+        // Android/POSIX signals may interrupt poll without harming any URB.
+        // Keep the pending transfers alive; disconnect and other errors still
+        // terminate the worker and cancel all transfers before release.
+        if (!eventPollMayContinue(result)) check(result);
     }
 
     // Cancellation is asynchronous: keep every buffer and the context alive
@@ -370,10 +388,33 @@ public:
         bool hadMusic = false;
         bool reportedPadding = false;
         auto lastPaddingReport = std::chrono::steady_clock::now();
+        auto lastLoop = lastPaddingReport;
+        auto lastGapReport = lastLoop;
+        bool reportedGap = false;
+        uint64_t largestGapUs = 0;
         for (;;) {
             events();
+            const auto loopNow = std::chrono::steady_clock::now();
+            const auto gapUs = std::chrono::duration_cast<std::chrono::microseconds>(loopNow - lastLoop).count();
+            lastLoop = loopNow;
             std::unique_lock<std::mutex> lock(state.mutex);
             if (state.closed) break;
+            // Read playing only under its mutex. A gap in this worker differs
+            // from decoder/network starvation (the PCM padding diagnostic).
+            if (state.playing && started && gapUs >= 50000) {
+                largestGapUs = std::max(largestGapUs, static_cast<uint64_t>(gapUs));
+                if (!reportedGap || loopNow - lastGapReport >= std::chrono::seconds(5)) {
+                    size_t pending = 0;
+                    for (const auto &slot : slots) if (slot->pending) ++pending;
+                    __android_log_print(ANDROID_LOG_WARN, "PureBitsUsb",
+                                        "Worker loop gap: %llu us; queued=%zu bytes; pending=%zu/%zu; media_frames=%llu",
+                                        static_cast<unsigned long long>(largestGapUs), state.bytes.size(),
+                                        pending, slots.size(), static_cast<unsigned long long>(state.frames));
+                    largestGapUs = 0;
+                    reportedGap = true;
+                    lastGapReport = loopNow;
+                }
+            }
             if (!state.controls.empty()) {
                 auto request = std::move(state.controls.front());
                 state.controls.pop_front();
@@ -414,7 +455,7 @@ public:
                 }
                 if (!slot || slot->pending) break;
                 const auto outcome = slot->outcome();
-                if (outcome != TransferOutcome::Complete) slot->logFailure(++failures);
+                if (outcome != TransferOutcome::Complete) slot->logFailure(++failures, outcome == TransferOutcome::Fatal);
                 require(health.accept(outcome, static_cast<uint64_t>(packets) * interval),
                         outcome == TransferOutcome::Fatal ? "USB audio transfer failed" : "USB packet loss persisted");
                 // Lost isochronous packets cannot be retried. Advance past their
@@ -518,7 +559,14 @@ public:
         auto result = opened.get_future();
         worker = std::thread([this, fd, candidates = std::move(candidates), opened = std::move(opened)]() mutable {
             // Best effort; failure changes scheduling only, never audio data.
-            setpriority(PRIO_PROCESS, 0, -16);
+            const int priorityResult = setpriority(PRIO_PROCESS, 0, -16);
+            const int priorityError = priorityResult == 0 ? 0 : errno;
+            errno = 0;
+            const int actualPriority = getpriority(PRIO_PROCESS, 0);
+            const int readPriorityError = errno;
+            __android_log_print(ANDROID_LOG_INFO, "PureBitsUsb",
+                                "Worker priority: requested=-16 actual=%d set_result=%d set_errno=%d get_errno=%d",
+                                actualPriority, priorityResult, priorityError, readPriorityError);
             std::unique_ptr<Session> session;
             try {
                 // Android owns the descriptor and keeps it open until this

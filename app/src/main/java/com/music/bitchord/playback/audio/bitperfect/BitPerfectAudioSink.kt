@@ -47,8 +47,9 @@ import kotlin.math.abs
  * on, is a track the DAC cannot take at all. [DacFormatConverter] then fits it
  * to what the transport opened at, and the status says so.
  *
- * A pause longer than [IDLE_RELEASE_MS] hands a direct USB or AAudio exclusive
- * device back (see [suspend]), so the DAC can power down while nothing plays.
+ * Direct USB hands the DAC back immediately when paused, including audio-focus
+ * loss, so calls and other players can use Android's driver. AAudio retains its
+ * [IDLE_RELEASE_MS] idle timeout. See [suspend].
  * What it had been given but not yet played is kept, and play resumes from
  * that exact frame on a reopened device.
  *
@@ -136,6 +137,9 @@ internal class BitPerfectAudioSink(
     private var needsResync = false
     private var currentInput: ByteBuffer? = null
 
+    /** Decoder-owned input held while Direct USB is paused, without claiming the DAC. */
+    private var waitingInput: ByteBuffer? = null
+
     private var playing = false
     private var endOfStream = false
     private var stopped = false
@@ -195,7 +199,18 @@ internal class BitPerfectAudioSink(
     ): Boolean {
         pendingFailure?.let { pendingFailure = null; throw writeException(it) }
         releaseIfIdle()
+        pendingFailure?.let { pendingFailure = null; throw writeException(it) }
         val input = configured ?: return true
+        if (!playing && (requiresDirectUsb() || suspended)) {
+            // Media3 1.11 considers the renderer ready only when the sink has
+            // pending data. Retain this unconsumed decoder buffer so preparation
+            // can become READY without stealing the DAC from another app.
+            waitingInput = buffer.takeIf { it.remaining() >= input.frameBytes }
+            if (waitingInput != null) return false
+            buffer.position(buffer.limit())
+            return true
+        }
+        waitingInput = null
         if (suspended) {
             // Media3 keeps offering buffers while paused; the device stays released until play.
             if (!playing) return false
@@ -260,7 +275,16 @@ internal class BitPerfectAudioSink(
         playing = false
         transportStarted = false
         pausedAtMs = clock()
-        runCatching { transport?.pause() }
+        val active = transport ?: return
+        try {
+            // The USB pause waits for its in-flight completion clock to settle
+            // before suspend snapshots the unplayed raw samples.
+            active.pause()
+            if (active.driver.releasesWhenIdle) suspend()
+        } catch (error: BitPerfectTransportException) {
+            pendingFailure = error
+            closeTransport()
+        }
     }
 
     override fun handleDiscontinuity() {
@@ -271,6 +295,7 @@ internal class BitPerfectAudioSink(
         pendingFailure?.let { pendingFailure = null; throw writeException(it) }
         endOfStream = true
         releaseIfIdle()
+        pendingFailure?.let { pendingFailure = null; throw writeException(it) }
         if (suspended) {
             if (!playing) return
             try {
@@ -292,12 +317,12 @@ internal class BitPerfectAudioSink(
     }
 
     override fun isEnded(): Boolean =
-        (transport == null && !suspended) || (endOfStream && stopped && !hasPendingData())
+        (transport == null && !suspended && !hasPendingData()) || (endOfStream && stopped && !hasPendingData())
 
     override fun hasPendingData(): Boolean {
-        val held = output.hasRemaining() || resumeTail != null
+        val held = output.hasRemaining() || resumeTail != null || waitingInput?.hasRemaining() == true
         if (suspended) return held
-        val active = transport ?: return false
+        val active = transport ?: return held
         return held || playedFrames(active) < writtenFrames
     }
 
@@ -315,7 +340,12 @@ internal class BitPerfectAudioSink(
     }
 
     override fun flush() {
-        runCatching { transport?.flush() }
+        try {
+            transport?.flush()
+        } catch (error: BitPerfectTransportException) {
+            pendingFailure = error
+            closeTransport()
+        }
         transportStarted = false
         resetCounters()
     }
@@ -323,6 +353,9 @@ internal class BitPerfectAudioSink(
     override fun reset() {
         flush()
         closeTransport()
+        // A renderer reset abandons the failed stream. Its deferred clock or
+        // volume error must not poison the next explicitly prepared stream.
+        pendingFailure = null
     }
 
     override fun release() {
@@ -433,13 +466,11 @@ internal class BitPerfectAudioSink(
         output.clear().limit(0)
     }
 
-    /** Releases the device once playing has been stopped for [IDLE_RELEASE_MS]. */
+    /** Releases exclusive hardware when paused so other apps and calls can access the audio device. */
     private fun releaseIfIdle() {
         val active = transport ?: return
         if (playing || !active.driver.releasesWhenIdle) return
-        // Opened without ever playing (a queue restored paused, say): count from now.
-        if (pausedAtMs == NOT_PAUSED) pausedAtMs = clock()
-        if (clock() - pausedAtMs >= IDLE_RELEASE_MS) suspend()
+        suspend()
     }
 
     /**
@@ -472,7 +503,7 @@ internal class BitPerfectAudioSink(
         resumeTail = tail.takeIf { it.hasRemaining() }
         suspendedWire = Wire(active)
         suspended = true
-        Log.i(TAG, "Released ${active.driver.label} after a long pause, keeping ${tail.remaining() / outputFrameBytes} frames")
+        Log.i(TAG, "Released paused ${active.driver.label}, keeping ${tail.remaining() / outputFrameBytes} frames")
         runCatching { active.release() }
         outputs.release(this)
         outputs.publishIdle()
@@ -488,7 +519,7 @@ internal class BitPerfectAudioSink(
         val wire = suspendedWire
         suspended = false
         suspendedWire = null
-        if (resumeTail == null && !output.hasRemaining()) {
+        if (startMediaTimeUs == C.TIME_UNSET && resumeTail == null && !output.hasRemaining()) {
             current = null
             converter = null
             return
@@ -508,7 +539,7 @@ internal class BitPerfectAudioSink(
         recent?.clear()
         // stop() went to the device just released; a stream already ended must be told again.
         stopped = false
-        Log.i(TAG, "Reopened ${opened.driver.label} on ${opened.deviceName} after a long pause")
+        Log.i(TAG, "Reopened ${opened.driver.label} on ${opened.deviceName} after pause")
         publishStatus()
     }
 
@@ -695,6 +726,7 @@ internal class BitPerfectAudioSink(
         startMediaTimeUs = C.TIME_UNSET
         needsResync = false
         currentInput = null
+        waitingInput = null
         endOfStream = false
         stopped = false
         advancingReported = false
@@ -716,7 +748,7 @@ internal class BitPerfectAudioSink(
         private const val OUTPUT_CHUNK_FRAMES = 4096
         private const val MAX_TIMESTAMP_DRIFT_US = 200_000L
 
-        /** A pause this long releases a direct USB or AAudio exclusive device. */
+        /** A pause this long releases an AAudio exclusive device. Direct USB releases immediately. */
         const val IDLE_RELEASE_MS = 30_000L
         private const val NOT_PAUSED = -1L
     }
