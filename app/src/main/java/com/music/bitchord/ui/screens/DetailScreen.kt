@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.data.SongLanguages
+import com.music.bitchord.data.SongLanguagePolicy
 import com.music.bitchord.ui.components.SongLanguageFilter
 
 import com.music.bitchord.ui.components.trackArtSize
@@ -480,22 +481,30 @@ fun DetailScreen(
             finally { detectingLanguages = false }
         }
     }
-    val languageActive = supportsLanguages && selectedLanguage.isNotEmpty()
     val languageCounts = remember(rawSongs, languageEntries, supportsLanguages) {
         if (supportsLanguages) rawSongs.groupingBy { SongLanguages.language(it, languageEntries) }.eachCount() else emptyMap()
     }
-    val matches = remember(songs, query, languageActive, selectedLanguage, languageEntries) {
-        songs.matching(query).filter { !languageActive || SongLanguages.language(it.value, languageEntries) == selectedLanguage }
+    val activeLanguage = SongLanguagePolicy.availableFilter(selectedLanguage, languageCounts)
+    val languageActive = supportsLanguages && activeLanguage.isNotEmpty()
+    LaunchedEffect(selectedLanguage, activeLanguage, page.songs is UiState.Success) {
+        // Wait through a loading state, but never leave a hidden, empty filter active.
+        if (page.songs is UiState.Success && selectedLanguage != activeLanguage) {
+            selectedLanguage = activeLanguage
+            folder?.state?.clear()
+        }
+    }
+    val matches = remember(songs, query, languageActive, activeLanguage, languageEntries) {
+        songs.matching(query).filter { !languageActive || SongLanguages.language(it.value, languageEntries) == activeLanguage }
     }
     val playVisible: (List<Song>, Int) -> Unit = { tracks, index ->
         if (tracks.isNotEmpty()) {
-            if (languageActive && onLanguageSongClick != null) onLanguageSongClick(tracks, index, selectedLanguage)
+            if (languageActive && onLanguageSongClick != null) onLanguageSongClick(tracks, index, activeLanguage)
             else onSongClick(tracks, index)
         }
     }
     val shuffleVisible: (List<Song>) -> Unit = { tracks ->
         if (tracks.isNotEmpty()) {
-            if (languageActive && onLanguageShuffle != null) onLanguageShuffle(tracks, selectedLanguage)
+            if (languageActive && onLanguageShuffle != null) onLanguageShuffle(tracks, activeLanguage)
             else onShuffle(tracks)
         }
     }
@@ -646,7 +655,7 @@ fun DetailScreen(
 
             if (supportsLanguages) {
                 item(key = "song-languages") {
-                    SongLanguageFilter(languageCounts, selectedLanguage, {
+                    SongLanguageFilter(languageCounts, activeLanguage, {
                         selectedLanguage = it
                         folder?.state?.clear()
                     }, detectingLanguages)

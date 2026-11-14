@@ -6,7 +6,7 @@
     <string name="language_automatic">Automatic · %1$s</string>
     <string name="language_filter_help">Change a song’s language from its menu. Play and Shuffle use this filter.</string>
     <string name="language_detecting">Checking available lyrics… You can correct any song from its menu.</string>
-    <string name="language_picker_help">Detected from lyrics when available, with Japanese and Malayalam title hints. Translated titles and mixed languages may need a correction. This applies to Downloads and Liked Songs.</string>
+    <string name="language_picker_help">Detected from available lyrics or clear title hints. Uncertain songs stay Unknown. Corrections here apply to Downloads and Liked Songs.</string>
     <string name="language_no_matches">No songs in this language yet. Try All or change a song’s language from its menu.</string>
     <string name="language_autoplay_off">Autoplay is off for this language-filtered queue.</string>
     <string name="export_saved_downloads">Export existing downloads</string>

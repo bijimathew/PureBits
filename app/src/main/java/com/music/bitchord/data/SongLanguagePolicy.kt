@@ -45,6 +45,15 @@ object SongLanguagePolicy {
 
     fun enoughLyrics(text: String): Boolean = text.count(Char::isLetter) >= 60
 
+    /** Filters describe this library, with no language-specific presets. */
+    fun filterCodes(counts: Map<String, Int>): List<String> = listOf("") +
+        counts.filter { (code, count) -> code.isNotBlank() && count > 0 }.keys
+            .sortedWith(compareBy<String> { it == UNKNOWN }.thenBy(::label).thenBy { it })
+
+    /** Reclassification or deletion can remove the last song in the selected language. */
+    fun availableFilter(selected: String, counts: Map<String, Int>): String =
+        selected.takeIf { (counts[it] ?: 0) > 0 }.orEmpty()
+
     fun label(code: String): String = when (code) {
         UNKNOWN -> "Unknown"
         "zxx" -> "Instrumental"
@@ -52,10 +61,10 @@ object SongLanguagePolicy {
             .replaceFirstChar { it.titlecase(Locale.getDefault()) }.ifBlank { code }
     }
 
-    val manualLanguages: List<String> = listOf("ml", "ja", "en", "zxx", UNKNOWN) +
-        listOf("af", "ar", "az", "be", "bg", "bn", "ca", "cs", "cy", "da", "de", "el", "es", "et",
+    val manualLanguages: List<String> =
+        listOf("af", "ar", "az", "be", "bg", "bn", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et",
             "eu", "fa", "fi", "fil", "fr", "ga", "gl", "gu", "he", "hi", "hr", "hu", "hy", "id", "is",
-            "it", "ka", "kk", "km", "kn", "ko", "lo", "lt", "lv", "mk", "mn", "mr", "ms", "my", "ne",
+            "it", "ja", "ka", "kk", "km", "kn", "ko", "lo", "lt", "lv", "mk", "ml", "mn", "mr", "ms", "my", "ne",
             "nl", "no", "pa", "pl", "pt", "ro", "ru", "si", "sk", "sl", "sq", "sr", "sv", "sw", "ta",
-            "te", "th", "tr", "uk", "ur", "uz", "vi", "zh").sortedBy(::label)
+            "te", "th", "tr", "uk", "ur", "uz", "vi", "zh").sortedBy(::label) + listOf("zxx", UNKNOWN)
 }

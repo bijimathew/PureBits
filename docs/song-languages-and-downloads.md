@@ -1,8 +1,12 @@
 # Song languages and public downloads
 
 Downloads, YouTube Liked Music, offline Liked Songs and Spotify Liked Songs have
-language chips, including Malayalam, Japanese, English, All and languages found
-in the list. Counts cover the loaded songs. Selecting a language narrows the
+language chips generated only from the languages present in each list, alongside
+All. There are no pinned language presets. Unknown appears only while there are
+unclassified songs, and an empty library shows All alone. If a correction or
+deletion removes the last song in a selected language, the filter returns to All.
+The manual correction picker lists languages alphabetically without favorites.
+Counts cover the loaded songs. Selecting a language narrows the
 song list; Play, Shuffle and row taps start that selection. A language selection
 opens a fresh queue, excludes the old manual queue and does not load unfiltered
 playlist continuations or AutoPlay recommendations. Normal queues retain the
@@ -69,10 +73,12 @@ Device verification:
 ## Build verification (2026-11-14)
 
 JDK 21: `:app:testDevDebugUnitTest :app:assembleDevDebug :app:assembleProdRelease`
-completed successfully. The unit reports contain 1,419 tests, zero failures/errors
-and one existing skipped test. Fifteen new cases cover language hints, correction
+completed successfully. The unit reports contain 1,423 tests, zero failures/errors
+and one existing skipped test. Nineteen feature regression cases cover language hints, correction
 precedence and serialization, filtered queue navigation and AutoPlay policy, byte
-integrity, cancellation, private path boundaries and legacy filename collisions.
+integrity, cancellation, private path boundaries, legacy filename collisions,
+library-specific language filters, Unknown visibility and selection resets after
+correction or deletion.
 Release lint and R8 completed with the existing Kotlin metadata/deprecation warnings.
 
 Both artifacts retain version 2.3, code 43. The arm64 Dev APK is signed and its
@@ -80,5 +86,6 @@ signature was verified; it uses the separate `com.dev.bitchord` application ID.
 The bundled language model and arm64 inference library were verified inside that
 APK. The arm64 production APK uses `com.music.bitchord` and is unsigned; sign it
 with the existing release key before installing over the production app. Copies
-and SHA-256 checksums are under `build/outputs/PureBits-2.3-languages-downloads-*`.
+and SHA-256 checksums for the adaptive filters are under
+`build/outputs/PureBits-2.3-adaptive-languages-*`.
 The device checks above have not been performed in this session.

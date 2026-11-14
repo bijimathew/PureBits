@@ -37,7 +37,7 @@ import com.music.bitchord.data.model.Song
 
 @Composable
 fun SongLanguageFilter(counts: Map<String, Int>, selected: String, onSelect: (String) -> Unit, detecting: Boolean) {
-    val codes = (listOf("", "ml", "ja", "en") + counts.keys.sortedBy(SongLanguagePolicy::label) + selected).distinct()
+    val codes = remember(counts) { SongLanguagePolicy.filterCodes(counts) }
     Column {
         Text(stringResource(R.string.song_language), Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.titleSmall)
         LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

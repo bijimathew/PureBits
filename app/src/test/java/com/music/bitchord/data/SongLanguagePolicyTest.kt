@@ -8,6 +8,33 @@ import org.junit.Test
 class SongLanguagePolicyTest {
     private fun song(title: String) = Song(videoId = "test", title = title, artist = "ASU", thumbnailUrl = null, fromAutoplay = false)
 
+    @Test fun filtersOnlyOfferLanguagesInThisLibrary() {
+        val filters = SongLanguagePolicy.filterCodes(mapOf("en" to 12, "hi" to 8))
+        assertEquals("", filters.first())
+        assertEquals(setOf("", "en", "hi"), filters.toSet())
+        assertFalse(filters.contains("ml"))
+        assertFalse(filters.contains("ja"))
+    }
+
+    @Test fun emptyLibraryAndZeroCountsDoNotCreateLanguagePresets() {
+        assertEquals(listOf(""), SongLanguagePolicy.filterCodes(emptyMap()))
+        assertEquals(listOf(""), SongLanguagePolicy.filterCodes(mapOf("en" to 0, "ja" to 0, "ml" to 0)))
+        assertEquals(setOf("", "es"), SongLanguagePolicy.filterCodes(mapOf("es" to 3)).toSet())
+    }
+
+    @Test fun unknownOnlyAppearsWhileThereAreUnclassifiedSongs() {
+        assertEquals(listOf("", "und"), SongLanguagePolicy.filterCodes(mapOf("und" to 2)))
+        assertEquals(setOf("", "fr"), SongLanguagePolicy.filterCodes(mapOf("fr" to 2, "und" to 0)).toSet())
+    }
+
+    @Test fun deletingOrReclassifyingTheLastMatchingSongReturnsToAll() {
+        assertEquals("en", SongLanguagePolicy.availableFilter("en", mapOf("en" to 1, "hi" to 2)))
+        assertEquals("", SongLanguagePolicy.availableFilter("en", mapOf("hi" to 2)))
+        assertEquals("", SongLanguagePolicy.availableFilter("und", mapOf("en" to 3, "und" to 0)))
+        assertEquals("", SongLanguagePolicy.availableFilter("ja", emptyMap()))
+        assertEquals("", SongLanguagePolicy.availableFilter("", mapOf("en" to 3)))
+    }
+
     @Test fun romanizedAndEnglishTitlesRemainUnknownWithoutLyrics() {
         listOf("Aval", "Podimeesha", "Slowly", "Under bouquet", "Bling-Bang-Bang-Born").forEach {
             assertEquals("und", SongLanguagePolicy.language(song(it), null))
