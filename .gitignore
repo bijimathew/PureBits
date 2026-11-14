@@ -39,6 +39,7 @@ keystore.properties
 .shots/
 .tmp_verify/
 .debug/
+/docs/usb-background-investigation.md
 
 # AI agent configuration
 AGENTS.md

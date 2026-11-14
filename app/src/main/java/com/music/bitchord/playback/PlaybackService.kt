@@ -1,5 +1,6 @@
 package com.music.bitchord.playback
 
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -861,6 +862,50 @@ class PlaybackService : MediaLibraryService() {
                 "bufferedPositionMs=${active.bufferedPosition} bufferedDurationMs=${active.totalBufferedDuration}",
             about = active.currentMediaItem?.mediaId,
         )
+    }
+
+    /**
+     * The transport's existing health log runs on Media3's playback thread and
+     * cannot report while that thread is blocked. Sample from the service main
+     * looper instead. Native diagnostics try the queue lock without waiting;
+     * monitoring must never join a stuck transport or alter playback/gain.
+     */
+    private fun watchDirectUsbExecution() {
+        scope.launch {
+            AppSettings.bitPerfectMode.collectLatest { mode ->
+                if (mode != BitPerfectMode.USB_DIRECT) return@collectLatest
+                val process = ActivityManager.RunningAppProcessInfo()
+                var lastElapsed = SystemClock.elapsedRealtime()
+                var lastUptime = SystemClock.uptimeMillis()
+                while (isActive) {
+                    delay(2000L)
+                    val elapsed = SystemClock.elapsedRealtime()
+                    val uptime = SystemClock.uptimeMillis()
+                    val interval = elapsed - lastElapsed
+                    val awakeInterval = uptime - lastUptime
+                    lastElapsed = elapsed
+                    lastUptime = uptime
+                    val active = player ?: continue
+                    if (!active.playWhenReady && !BitPerfectOutput.status.value.active) continue
+                    // Closing/reconfiguring a transport concurrently is normal.
+                    val sample = runCatching { BitPerfectOutput.directUsbDiagnostics() }
+                        .getOrNull() ?: "native=unavailable"
+                    val importance = runCatching {
+                        ActivityManager.getMyMemoryState(process)
+                        process.importance
+                    }.getOrDefault(-1)
+                    TrackLog.d(
+                        "AUDIO_OUT",
+                        "USB monitor v2: intervalMs=$interval awakeIntervalMs=$awakeInterval " +
+                            "foregroundService=$isPlaybackOngoing importance=$importance " +
+                            "state=${active.playbackState} playWhenReady=${active.playWhenReady} " +
+                            "suppression=${active.playbackSuppressionReason} " +
+                            "bufferedDurationMs=${active.totalBufferedDuration} $sample",
+                        about = active.currentMediaItem?.mediaId,
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -1835,6 +1880,7 @@ class PlaybackService : MediaLibraryService() {
         observeScrobbling()
         observeDiscord()
         watchSleepTimer()
+        watchDirectUsbExecution()
         val restored = if (PartyPersonalQueueStash.hasStash()) {
             val stashed = PartyPersonalQueueStash.load()
             PartyPersonalQueueStash.clear()

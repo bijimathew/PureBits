@@ -493,18 +493,21 @@ class BitPerfectAudioSinkTest {
         val first = outputs.opened.single()
         sink.pause()
         assertFalse(first.playing)
+        assertTrue(first.released)
         sink.flush()
         sink.play()
         sink.handleBuffer(pcm16(4), 10_000_000, 1)
         assertEquals(-40.0, first.softwareVolumeDb!!, 0.0)
-        assertEquals(1, outputs.opened.size)
+        assertEquals(2, outputs.opened.size)
+        val resumed = outputs.opened.last()
+        assertEquals(-40.0, resumed.softwareVolumeDb!!, 0.0)
         sink.configure(config(format().buildUpon().setId("next").build()))
         sink.handleBuffer(pcm16(4), 10_000_091, 1)
-        assertEquals(1, outputs.opened.size)
-        first.advance(first.written)
+        assertEquals(2, outputs.opened.size)
+        resumed.advance(resumed.written)
         sink.configure(config(format(rate = 48000)))
         assertTrue(sink.handleBuffer(pcm16(4), 10_000_182, 1))
-        assertEquals(2, outputs.opened.size)
+        assertEquals(3, outputs.opened.size)
         val next = outputs.opened.last()
         assertEquals(48000, next.sampleRate)
         assertEquals(-40.0, next.softwareVolumeDb!!, 0.0)
@@ -544,7 +547,7 @@ class BitPerfectAudioSinkTest {
     // ---- Idle release ---------------------------------------------------------------------
 
     @Test
-    fun longPauseReleasesTheDeviceAndResumesAtTheSameFrame() {
+    fun directPauseImmediatelyReleasesTheDeviceAndResumesAtTheSameFrame() {
         var now = 0L
         val outputs = FakeOutputs().apply { driver = BitPerfectDriver.USB_DIRECT }
         val sink = BitPerfectAudioSink(outputs) { now }
@@ -554,12 +557,15 @@ class BitPerfectAudioSinkTest {
         val first = outputs.opened.single()
         first.advance(1200)
         sink.pause()
+        assertTrue(first.released)
+        assertEquals(1, outputs.releases)
 
-        // Paused, Media3 keeps offering buffers: taken while there is room, the device kept open.
+        // Media3 can prepare more data while paused without reclaiming the DAC
+        // or consuming its decoder-owned buffer. It must still report ready.
         now = BitPerfectAudioSink.IDLE_RELEASE_MS - 1
         val more = pcm16(4800, start = 9600)
         assertFalse(sink.handleBuffer(more, 100_000, 1))
-        assertFalse(first.released)
+        assertEquals(0, more.position())
 
         now = BitPerfectAudioSink.IDLE_RELEASE_MS
         assertFalse(sink.handleBuffer(more, 100_000, 1))
@@ -570,7 +576,7 @@ class BitPerfectAudioSinkTest {
         assertFalse(sink.isEnded())
 
         sink.play()
-        // The kept 8192 frames fill the new device; the 208 converted after them wait.
+        // The unplayed 3600 frames precede the new 4800; 208 wait for capacity.
         assertFalse(sink.handleBuffer(more, 100_000, 1))
         val second = outputs.opened.last()
         assertEquals(2, outputs.opened.size)
@@ -578,16 +584,20 @@ class BitPerfectAudioSinkTest {
         assertEquals(25_000, sink.getCurrentPositionUs(false))
         // The new device starts with exactly what the old one had not played.
         val kept = first.bytes.toByteArray().copyOfRange(1200 * first.frameBytes, first.bytes.size())
-        assertTrue(kept.contentEquals(second.bytes.toByteArray()))
+        assertTrue(kept.contentEquals(second.bytes.toByteArray().copyOfRange(0, kept.size)))
 
         second.advance(2400)
         assertTrue(sink.handleBuffer(more, 100_000, 1))
         assertEquals(8192L + 208, second.written)
+        // This fake DAC accepts PCM24: PCM16 samples are left-aligned in it.
+        val expectedNew = ByteBuffer.allocate(4800 * first.frameBytes).order(ByteOrder.LITTLE_ENDIAN)
+        repeat(4800 * 2) { expectedNew.put(0).putShort((9600 + it).toShort()) }
+        assertTrue((kept + expectedNew.array()).contentEquals(second.bytes.toByteArray()))
         assertEquals(75_000, sink.getCurrentPositionUs(false))
     }
 
     @Test
-    fun mixerOutputIsNeverReleasedIdle() {
+    fun pausedMixerHandsDeviceBackAndDoesNotReopenUntilPlay() {
         var now = 0L
         val outputs = FakeOutputs()
         val sink = BitPerfectAudioSink(outputs) { now }
@@ -595,9 +605,17 @@ class BitPerfectAudioSinkTest {
         sink.play()
         sink.handleBuffer(pcm16(441), 0, 1)
         sink.pause()
+        assertTrue(outputs.opened.single().released)
         now = 10 * BitPerfectAudioSink.IDLE_RELEASE_MS
-        sink.handleBuffer(pcm16(441), 10_000, 1)
-        assertFalse(outputs.opened.single().released)
+        val more = pcm16(441)
+        assertFalse(sink.handleBuffer(more, 10_000, 1))
+        assertEquals(1, outputs.opened.size)
+        assertEquals(0, more.position())
+        assertTrue(sink.hasPendingData())
+        sink.play()
+        assertTrue(sink.handleBuffer(more, 10_000, 1))
+        assertEquals(2, outputs.opened.size)
+        assertTrue(outputs.opened.last().playing)
     }
 
     @Test

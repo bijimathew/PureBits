@@ -225,6 +225,9 @@ internal object BitPerfectOutput {
     private var owner: Any? = null
     @Volatile private var active: BitPerfectTransport? = null
 
+    /** Independent of the playback thread and this owner's potentially busy lock. */
+    fun directUsbDiagnostics(): String? = (active as? UsbDirectTransport)?.diagnostics()
+
     @Volatile private var directReleasedAtMs = 0L
 
     /**
@@ -323,6 +326,7 @@ internal object BitPerfectOutput {
                 if (!usb.hasPermission(device)) throw BitPerfectTransportException("permission_denied")
                 UsbDirectTransport.open(
                     manager = usb,
+                    audioManager = manager,
                     device = device,
                     rate = sampleRate,
                     channels = channels,

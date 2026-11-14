@@ -147,4 +147,50 @@ class UsbProgressWatchdogTest {
         assertThrows(IllegalArgumentException::class.java) { watchdog.setPlaying(true, -1) }
         assertThrows(IllegalArgumentException::class.java) { watchdog.observe(0, -1) }
     }
+
+    @Test fun firstCallbackAfterProcessSuspensionLetsTheWorkerResume() {
+        val watchdog = UsbProgressWatchdog()
+        watchdog.onWritten(7_232, 0)
+        watchdog.setPlaying(true, 0)
+        assertFalse(watchdog.observe(0, 10))
+        // The Media3 and native worker threads were both suspended for ~3 s.
+        // Media3 happens to resume first, seeing the old completion counter.
+        assertFalse(watchdog.observe(0, 2_893))
+        assertFalse(watchdog.observe(2_822, 2_900))
+        assertFalse(watchdog.observe(7_232, 3_000))
+    }
+
+    @Test fun processSuspensionGraceStillDetectsAWorkerThatDoesNotRecover() {
+        val watchdog = UsbProgressWatchdog()
+        watchdog.onWritten(7_232, 0)
+        watchdog.setPlaying(true, 0)
+        assertFalse(watchdog.observe(0, 10))
+        assertFalse(watchdog.observe(0, 68_475))
+        assertFalse(watchdog.observe(0, 70_474))
+        assertTrue(watchdog.observe(0, 70_475))
+    }
+
+    @Test fun aWriteCanBeTheFirstCallbackAfterSuspension() {
+        val watchdog = UsbProgressWatchdog()
+        watchdog.onWritten(7_232, 0)
+        watchdog.setPlaying(true, 0)
+        assertFalse(watchdog.observe(0, 10))
+        watchdog.onWritten(100, 3_000)
+        assertFalse(watchdog.observe(0, 3_001))
+        watchdog.onWritten(0, 4_000)
+        assertFalse(watchdog.observe(0, 4_999))
+        assertTrue(watchdog.observe(0, 5_000))
+    }
+
+    @Test fun regularCallbacksCannotDisguiseAStallAsProcessSuspension() {
+        val watchdog = UsbProgressWatchdog()
+        watchdog.onWritten(7_232, 0)
+        watchdog.setPlaying(true, 0)
+        for (time in 100L..1_900L step 100L) {
+            watchdog.onWritten(0, time)
+            watchdog.setPlaying(true, time)
+            assertFalse(watchdog.observe(0, time))
+        }
+        assertTrue(watchdog.observe(0, 2_000))
+    }
 }

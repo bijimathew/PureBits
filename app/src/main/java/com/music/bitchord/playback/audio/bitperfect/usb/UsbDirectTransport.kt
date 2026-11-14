@@ -12,6 +12,7 @@ package com.music.bitchord.playback.audio.bitperfect.usb
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
+import android.media.AudioManager
 import android.os.SystemClock
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.settings.UsbDirectVolumeMode
@@ -34,6 +35,8 @@ internal object UsbDirectNative {
     external fun setPlaying(handle: Long, playing: Boolean)
     external fun flush(handle: Long)
     external fun frames(handle: Long): Long
+    /** Best-effort sample; never waits for the native PCM queue lock. */
+    external fun diagnostics(handle: Long): LongArray?
     external fun control(handle: Long, input: Boolean, request: Int, value: Int, index: Int, data: ByteArray): ByteArray
     external fun close(handle: Long)
 
@@ -74,6 +77,7 @@ internal class UsbDirectTransport private constructor(
     private val format: UsbDescriptors.OutputFormat,
     private val volumeControl: UsbVolume.Volume?,
     initialSoftwareDb: Double?,
+    private val backgroundActivity: UsbPlaybackActivity?,
 ) : BitPerfectTransport {
 
     override val driver = BitPerfectDriver.USB_DIRECT
@@ -86,9 +90,11 @@ internal class UsbDirectTransport private constructor(
     override val bufferSizeFrames: Long = UsbDirectNative.capacity(handle).toLong()
 
     @Volatile private var failure: String? = null
-    private var lastFrames = 0L
-    private var acceptedFrames = 0L
-    private var playing = false
+    @Volatile private var lastFrames = 0L
+    @Volatile private var acceptedFrames = 0L
+    @Volatile private var playing = false
+    @Volatile private var playbackCall = "idle"
+    @Volatile private var playbackCallAtMs = SystemClock.elapsedRealtime()
     private var lastHealthLogMs = 0L
     private val progress = UsbProgressWatchdog()
     @Volatile private var softwareDb = initialSoftwareDb
@@ -157,31 +163,34 @@ internal class UsbDirectTransport private constructor(
 
     fun markFailedVolume() = fail("USB volume state could not be established")
 
-    override fun write(buffer: ByteBuffer): Int {
+    override fun write(buffer: ByteBuffer): Int = observePlaybackCall("write") {
         val count = call { writer.write(buffer) }
         if (count > 0) {
             val frames = (count / (channelCount * format.subslot)).toLong()
             call { progress.onWritten(frames, SystemClock.elapsedRealtime()) }
             acceptedFrames += frames
         }
-        return count
+        count
     }
 
-    override fun play() {
+    override fun play() = observePlaybackCall("play") {
         call { UsbDirectNative.setPlaying(handle, true) }
         playing = true
         call { progress.setPlaying(true, SystemClock.elapsedRealtime()) }
+        backgroundActivity?.start()
         logState("play")
     }
 
-    override fun pause() {
+    override fun pause() = observePlaybackCall("pause") {
         playing = false
+        backgroundActivity?.stop()
         call { progress.setPlaying(false, SystemClock.elapsedRealtime()) }
         call { UsbDirectNative.setPlaying(handle, false) }
         logState("pause")
     }
 
-    override fun flush() {
+    override fun flush() = observePlaybackCall("flush") {
+        backgroundActivity?.stop()
         call { UsbDirectNative.flush(handle) }
         writer.flush()
         progress.reset()
@@ -193,9 +202,9 @@ internal class UsbDirectTransport private constructor(
     /** The queue runs dry and the worker pads with silence that is not counted as played. */
     override fun stop() = Unit
 
-    override fun playedFrames(): Long {
+    override fun playedFrames(): Long = observePlaybackCall("frames") {
         failure?.let { throw BitPerfectTransportException(it) }
-        if (handle == 0L) return lastFrames
+        if (handle == 0L) return@observePlaybackCall lastFrames
         lastFrames = maxOf(lastFrames, call { UsbDirectNative.frames(handle) })
         val now = SystemClock.elapsedRealtime()
         if (call { progress.observe(lastFrames, now) }) {
@@ -207,7 +216,36 @@ internal class UsbDirectTransport private constructor(
             lastHealthLogMs = now
             logState("health")
         }
-        return lastFrames
+        lastFrames
+    }
+
+    /** No PCM, gain, watchdog or lifetime changes; this can run while JNI is stuck. */
+    fun diagnostics(): String {
+        val opened = handle
+        val native = if (opened == 0L) null else UsbDirectNative.diagnostics(opened)
+        val age = (SystemClock.elapsedRealtime() - playbackCallAtMs).coerceAtLeast(0L)
+        val transport = "transportId=$opened playing=$playing playbackCall=$playbackCall callAgeMs=$age " +
+            "acceptedFrames=$acceptedFrames observedFrames=$lastFrames rateHz=$sampleRate " +
+            "backgroundActivity=${backgroundActivity?.status ?: "not-required"}"
+        if (native == null || native.size != 10) return "$transport native=unavailable"
+        val stage = WORKER_STAGES.getOrNull(native[0].toInt()) ?: "unknown"
+        return "$transport workerStage=$stage workerAgeMs=${native[1]} workerLoops=${native[2]} " +
+            "maxWorkerGapMs=${native[3]} queueFrames=${native[4]} nativeFrames=${native[5]} " +
+            "nativePlaying=${native[6]} paddingFrames=${native[7]} transferFailures=${native[8]} " +
+            "nativeError=${native[9]}"
+    }
+
+    // Primitive volatile markers rather than a lock or an allocation on each
+    // audio callback. Diagnostic readers may see adjacent calls' fields.
+    private inline fun <T> observePlaybackCall(name: String, block: () -> T): T {
+        playbackCallAtMs = SystemClock.elapsedRealtime()
+        playbackCall = name
+        return try {
+            block()
+        } finally {
+            playbackCallAtMs = SystemClock.elapsedRealtime()
+            playbackCall = "idle"
+        }
     }
 
     /** State changes and one bounded memory-log sample per five seconds, never audio bytes/URLs. */
@@ -219,12 +257,13 @@ internal class UsbDirectTransport private constructor(
             "rateHz=$sampleRate bits=$validBits", about = null)
     }
 
-    override fun release() {
+    override fun release() = observePlaybackCall("release") {
         logState("release")
         playing = false
         // Stop/cancel queued samples before releasing interfaces. In particular,
         // never restore an old (possibly 0 dB) hardware level while PCM is queued.
         gain.setTargetDb(UsbSoftwareVolumePolicy.MUTE_DB)
+        backgroundActivity?.close()
         if (handle != 0L) runCatching { UsbDirectNative.setPlaying(handle, false) }
         // The worker joins (cancelling and acknowledging every transfer, then
         // releasing the interfaces) before Android closes the descriptor.
@@ -232,6 +271,7 @@ internal class UsbDirectTransport private constructor(
         handle = 0
         writer.flush()
         runCatching { connection.close() }
+        Unit
     }
 
     @Synchronized
@@ -239,6 +279,7 @@ internal class UsbDirectTransport private constructor(
         failure = reason
         logState("failure ($reason)")
         gain.setTargetDb(UsbSoftwareVolumePolicy.MUTE_DB)
+        backgroundActivity?.close()
         if (handle != 0L) {
             runCatching { UsbDirectNative.setPlaying(handle, false) }
             runCatching { UsbDirectNative.flush(handle) }
@@ -257,8 +298,14 @@ internal class UsbDirectTransport private constructor(
 
     companion object {
         private const val HEALTH_LOG_MS = 5000L
+        // Must match WorkerStage in usb_transport.cpp.
+        private val WORKER_STAGES = arrayOf(
+            "opening", "events", "queueLock", "control", "cancel", "account",
+            "paused", "prefill", "submit", "closing", "stopped",
+        )
         fun open(
             manager: UsbManager,
+            audioManager: AudioManager,
             device: UsbDevice,
             rate: Int,
             channels: Int,
@@ -314,6 +361,7 @@ internal class UsbDirectTransport private constructor(
                     format = plan.format,
                     volumeControl = volume,
                     initialSoftwareDb = selection.softwareDb,
+                    backgroundActivity = UsbPlaybackActivity.forDevice(audioManager),
                 )
             } catch (error: Exception) {
                 if (handle != 0L) UsbDirectNative.close(handle)

@@ -38,7 +38,7 @@ internal class UsbProgressWatchdog(private val timeoutMs: Long = 2_000L) {
         armIfNeeded(nowMs)
     }
 
-    /** True only when queued media received no completion progress for the full timeout. */
+    /** True only after a full timeout without completions while the observer is running. */
     fun observe(playedFrames: Long, nowMs: Long): Boolean {
         require(playedFrames >= completedFrames && playedFrames <= acceptedFrames) { "Invalid USB completed frame count" }
         updateClock(nowMs)
@@ -72,9 +72,15 @@ internal class UsbProgressWatchdog(private val timeoutMs: Long = 2_000L) {
     private fun updateClock(nowMs: Long) {
         require(nowMs >= 0L) { "Invalid USB progress clock" }
         val previous = lastNowMs
-        if (previous >= 0L && nowMs < previous && waitingSinceMs >= 0L) {
-            // elapsedRealtime is monotonic in production. Rebase a replacement
-            // or test clock instead of subtracting across a backwards jump.
+        if (previous >= 0L && waitingSinceMs >= 0L &&
+            (nowMs < previous || nowMs - previous > timeoutMs)
+        ) {
+            // The observer can be suspended along with the native worker (seen
+            // on Xiaomi during app launches). Its first callback after thawing
+            // may run before the worker can account for completions. Time we
+            // could not observe is not evidence of a wedged USB consumer: allow
+            // one fresh timeout. Regular writes/play callbacks do NOT renew it.
+            // Also rebase a replacement/test clock that jumps backwards.
             waitingSinceMs = nowMs
         }
         lastNowMs = nowMs

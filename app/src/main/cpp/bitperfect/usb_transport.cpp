@@ -30,6 +30,8 @@
 #include <sys/time.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
@@ -104,6 +106,14 @@ struct ControlRequest {
     std::promise<std::vector<uint8_t>> reply;
 };
 
+// Diagnostic values only: never use these approximate, independently sampled
+// fields to decide whether to play, change gain or reclaim the USB interface.
+enum class WorkerStage { Opening, Events, QueueLock, Control, Cancel, Account, Paused, Prefill, Submit, Closing, Stopped };
+int64_t monotonicMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 struct State {
     std::mutex mutex;
     std::condition_variable changed;
@@ -116,6 +126,12 @@ struct State {
     uint64_t flushed = 0;
     std::string error;
     std::deque<std::unique_ptr<ControlRequest>> controls;
+    std::atomic<WorkerStage> workerStage{WorkerStage::Opening};
+    std::atomic<int64_t> workerLoopAtMs{0};
+    std::atomic<int64_t> workerLoops{0};
+    std::atomic<int64_t> largestLoopGapMs{0};
+    std::atomic<int64_t> paddingFrames{0};
+    std::atomic<int64_t> transferFailures{0};
 };
 
 struct Slot {
@@ -392,11 +408,19 @@ public:
         auto lastGapReport = lastLoop;
         bool reportedGap = false;
         uint64_t largestGapUs = 0;
+        int64_t largestLoopGapMs = 0;
         for (;;) {
+            state.workerStage.store(WorkerStage::Events, std::memory_order_relaxed);
             events();
             const auto loopNow = std::chrono::steady_clock::now();
             const auto gapUs = std::chrono::duration_cast<std::chrono::microseconds>(loopNow - lastLoop).count();
             lastLoop = loopNow;
+            state.workerLoopAtMs.store(std::chrono::duration_cast<std::chrono::milliseconds>(
+                loopNow.time_since_epoch()).count(), std::memory_order_relaxed);
+            state.workerLoops.fetch_add(1, std::memory_order_relaxed);
+            largestLoopGapMs = std::max(largestLoopGapMs, static_cast<int64_t>(gapUs / 1000));
+            state.largestLoopGapMs.store(largestLoopGapMs, std::memory_order_relaxed);
+            state.workerStage.store(WorkerStage::QueueLock, std::memory_order_relaxed);
             std::unique_lock<std::mutex> lock(state.mutex);
             if (state.closed) break;
             // Read playing only under its mutex. A gap in this worker differs
@@ -419,12 +443,16 @@ public:
                 auto request = std::move(state.controls.front());
                 state.controls.pop_front();
                 lock.unlock();
+                state.workerStage.store(WorkerStage::Control, std::memory_order_relaxed);
                 serve(*request);
+                state.workerStage.store(WorkerStage::QueueLock, std::memory_order_relaxed);
                 lock.lock();
             }
             if (state.flush != state.flushed) {
                 lock.unlock();
+                state.workerStage.store(WorkerStage::Cancel, std::memory_order_relaxed);
                 drain();
+                state.workerStage.store(WorkerStage::QueueLock, std::memory_order_relaxed);
                 lock.lock();
                 state.bytes.clear();
                 state.frames = 0;
@@ -445,6 +473,7 @@ public:
             }
             // Account for transfers that completed, playing or not, so a pause
             // does not hold back the frame count by what was in flight.
+            state.workerStage.store(WorkerStage::Account, std::memory_order_relaxed);
             for (;;) {
                 // Account in submission order even when completion callbacks
                 // arrive together/out of order. The failure budget and playhead
@@ -455,7 +484,10 @@ public:
                 }
                 if (!slot || slot->pending) break;
                 const auto outcome = slot->outcome();
-                if (outcome != TransferOutcome::Complete) slot->logFailure(++failures, outcome == TransferOutcome::Fatal);
+                if (outcome != TransferOutcome::Complete) {
+                    slot->logFailure(++failures, outcome == TransferOutcome::Fatal);
+                    state.transferFailures.store(static_cast<int64_t>(failures), std::memory_order_relaxed);
+                }
                 require(health.accept(outcome, static_cast<uint64_t>(packets) * interval),
                         outcome == TransferOutcome::Fatal ? "USB audio transfer failed" : "USB packet loss persisted");
                 // Lost isochronous packets cannot be retried. Advance past their
@@ -470,6 +502,7 @@ public:
                 prefill.reset();
                 paddingFrames = musicFrames = 0;
                 hadMusic = false;
+                state.workerStage.store(WorkerStage::Paused, std::memory_order_relaxed);
                 state.changed.wait_for(lock, std::chrono::milliseconds(20));
                 continue;
             }
@@ -480,12 +513,14 @@ public:
                     // wait_for releases the queue lock, so the decoder can fill
                     // it. Without this, one 10 ms chunk was followed by ~54 ms
                     // of avoidable padding in the first scheduled transfer ring.
+                    state.workerStage.store(WorkerStage::Prefill, std::memory_order_relaxed);
                     state.changed.wait_for(lock, std::chrono::milliseconds(1));
                     continue;
                 }
                 lastFeedback = now;
                 started = true;
             }
+            state.workerStage.store(WorkerStage::Submit, std::memory_order_relaxed);
             if (feedbackSlot) {
                 if (!feedbackSlot->pending) {
                     const size_t got = std::min(feedbackSlot->actual(), feedbackSlot->bytes.size());
@@ -516,6 +551,8 @@ public:
                 if (hadMusic) {
                     musicFrames += available / frame;
                     paddingFrames += (total - available) / frame;
+                    state.paddingFrames.fetch_add(static_cast<int64_t>((total - available) / frame),
+                                                  std::memory_order_relaxed);
                 }
                 slot->sequence = sequence++;
                 slot->submit(handle, chosen.data.address, lengths, packets);
@@ -534,6 +571,7 @@ public:
             }
             state.changed.notify_all();
         }
+        state.workerStage.store(WorkerStage::Cancel, std::memory_order_relaxed);
         drain();
     }
 };
@@ -574,6 +612,7 @@ public:
                 session = std::make_unique<Session>(fd, candidates);
                 opened.set_value({session->chosenIndex, session->chosen.format});
             } catch (...) {
+                state.workerStage.store(WorkerStage::Stopped, std::memory_order_relaxed);
                 opened.set_exception(std::current_exception());
                 return;
             }
@@ -588,6 +627,7 @@ public:
             }
             // No post-error playback or hardware gain restoration: destruction
             // cancels every pending transfer before releasing the interfaces.
+            state.workerStage.store(WorkerStage::Closing, std::memory_order_relaxed);
             session.reset();
             std::lock_guard<std::mutex> lock(state.mutex);
             for (auto &request : state.controls) {
@@ -595,6 +635,7 @@ public:
             }
             state.controls.clear();
             state.changed.notify_all();
+            state.workerStage.store(WorkerStage::Stopped, std::memory_order_relaxed);
         });
         try {
             auto [index, chosenFormat] = result.get();
@@ -653,6 +694,31 @@ public:
         std::lock_guard<std::mutex> lock(state.mutex);
         if (!state.error.empty()) throw std::runtime_error(state.error);
         return state.frames;
+    }
+
+    // Called by the service, independently of Media3's playback thread. Never
+    // wait for the queue mutex: the write/frames calls may be blocked on it.
+    // -1 means the queue snapshot was busy, not empty or paused.
+    std::array<jlong, 10> diagnostics() {
+        const auto tick = state.workerLoopAtMs.load(std::memory_order_relaxed);
+        std::array<jlong, 10> values{
+            static_cast<jlong>(state.workerStage.load(std::memory_order_relaxed)),
+            tick == 0 ? -1 : std::max<int64_t>(0, monotonicMs() - tick),
+            state.workerLoops.load(std::memory_order_relaxed),
+            state.largestLoopGapMs.load(std::memory_order_relaxed),
+            -1, -1, -1,
+            state.paddingFrames.load(std::memory_order_relaxed),
+            state.transferFailures.load(std::memory_order_relaxed),
+            -1,
+        };
+        std::unique_lock<std::mutex> lock(state.mutex, std::try_to_lock);
+        if (lock.owns_lock()) {
+            values[4] = static_cast<jlong>(state.bytes.size() / frameBytes);
+            values[5] = static_cast<jlong>(state.frames);
+            values[6] = state.playing ? 1 : 0;
+            values[9] = state.error.empty() ? 0 : 1;
+        }
+        return values;
     }
 
     std::vector<uint8_t> control(bool input, int request, int value, int index, std::vector<uint8_t> data) {
@@ -777,6 +843,17 @@ JNIEXPORT void JNICALL JNI_USB(flush)(JNIEnv *env, jobject, jlong handle) {
 }
 JNIEXPORT jlong JNICALL JNI_USB(frames)(JNIEnv *env, jobject, jlong handle) {
     try { return static_cast<jlong>(get(handle)->frames()); } catch (const std::exception &e) { report(env, e); return 0; }
+}
+JNIEXPORT jlongArray JNICALL JNI_USB(diagnostics)(JNIEnv *env, jobject, jlong handle) {
+    try {
+        const auto values = get(handle)->diagnostics();
+        auto result = env->NewLongArray(static_cast<jsize>(values.size()));
+        if (result) env->SetLongArrayRegion(result, 0, static_cast<jsize>(values.size()), values.data());
+        return result;
+    } catch (const std::exception &) {
+        // Closing concurrently is normal; diagnostics must not fail playback.
+        return nullptr;
+    }
 }
 JNIEXPORT jbyteArray JNICALL JNI_USB(control)(JNIEnv *env, jobject, jlong handle, jboolean input, jint request,
                                               jint value, jint index, jbyteArray data) {
