@@ -45,6 +45,15 @@ class PartyAutoplayTest {
     // ------------------------------------------------------------- enabled --
 
     @Test
+    fun `language selection blocks unrelated recommendations without changing the preference`() {
+        val solo = ListenTogether.State()
+        assertFalse(autoplayEnabledFor(solo, true, "purebits:language:ml:VLLM"))
+        assertTrue(autoplayEnabledFor(solo, true, "VLLM"))
+        assertTrue(autoplayEnabledFor(solo, true, null))
+        assertTrue(autoplayEnabledFor(party(listOf(member("a", host = true))), true, "purebits:language:ml:VLLM"))
+    }
+
+    @Test
     fun `alone, AutoPlay is this phone's own setting`() {
         val solo = ListenTogether.State()
         assertTrue(autoplayEnabledFor(solo, localPreference = true))

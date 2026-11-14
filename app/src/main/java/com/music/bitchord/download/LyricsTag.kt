@@ -100,6 +100,10 @@ internal object LyricsTag {
         // not blank either, so the length check below would let it through.
         if (found.lines.none { it.text.isNotBlank() }) return null
 
+        com.music.bitchord.data.SongLanguages.learnFromLyrics(
+            track, found.lines.joinToString("\n") { it.text },
+        )
+
         val lrc = found.lines.toLrc()
         if (lrc.length > MAX_LRC_CHARS) {
             // Every byte of this is about to be copied into a file the user

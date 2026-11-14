@@ -268,9 +268,11 @@ internal fun LazyListScope.localFolderItems(
     onSongClick: (List<Song>, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
     onSongSwipe: (Song) -> Unit,
+    songsOnly: Boolean = false,
 ) {
+    val tab = if (songsOnly) LocalFolderTab.SONGS else state.tab
     val tabs = folder.tabs
-    item(key = "folder-tabs") {
+    if (!songsOnly) item(key = "folder-tabs") {
         SegmentedControl(
             options = tabs.map { it.label() },
             selectedIndex = tabs.indexOf(state.tab).coerceAtLeast(0),
@@ -281,7 +283,7 @@ internal fun LazyListScope.localFolderItems(
 
     // Ahead of the list rather than in the top bar: making a playlist is the
     // one thing this tab is for before there is anything on it.
-    if (state.tab == LocalFolderTab.PLAYLISTS && query.isBlank()) {
+    if (tab == LocalFolderTab.PLAYLISTS && query.isBlank()) {
         folder.onCreatePlaylist?.let { create ->
             item(key = "folder-new-playlist") {
                 NewPlaylistRow(palette, onClick = create)
@@ -291,14 +293,16 @@ internal fun LazyListScope.localFolderItems(
     }
 
     val grid = folder.viewType == LibraryViewType.GRID
-    val empty = when (state.tab) {
+    val empty = when (tab) {
         LocalFolderTab.SONGS -> songs.isEmpty()
         else -> groups.isEmpty()
     }
     if (empty) {
         item(key = "folder-empty") {
             MessageState(
-                if (query.isNotBlank()) {
+                if (songsOnly && query.isBlank()) {
+                    stringResource(R.string.language_no_matches)
+                } else if (query.isNotBlank()) {
                     stringResource(R.string.nothing_matches, query)
                 } else if (state.tab == LocalFolderTab.ALBUMS) {
                     stringResource(R.string.no_local_albums)
@@ -328,7 +332,7 @@ internal fun LazyListScope.localFolderItems(
     }
 
     val isCurrentRow = playingRowMatcher(songs, currentSong)
-    when (state.tab) {
+    when (tab) {
         LocalFolderTab.SONGS -> if (grid) {
             gridRows(songs.indices.toList(), columns, key = { "song-${songs[it].videoId}-$it" }) { index ->
                 val song = songs[index]

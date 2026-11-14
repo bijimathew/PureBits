@@ -435,6 +435,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (localUri != null) {
                 EmbeddedLyrics.forUri(getApplication(), localUri)?.let { embedded ->
                     _lyrics.value = embedded
+                    learnSongLanguage(videoId, title, artist, embedded)
                     // No source to name: what the file records is the lyrics,
                     // not which of the eight services they came from months ago.
                     _lyricsSource.value = null
@@ -458,8 +459,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             )
             val selected = selectedLyricsSource?.let(lyricsProviderResults::get) ?: found
             _lyrics.value = selected?.lines
+            selected?.lines?.let { learnSongLanguage(videoId, title, artist, it) }
             _lyricsSource.value = selected?.source
             _lyricsChecked.value = true
+        }
+    }
+
+    private fun learnSongLanguage(videoId: String, title: String, artist: String, lines: List<LyricLine>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            com.music.bitchord.data.SongLanguages.learnFromLyrics(
+                Song(videoId = videoId, title = title, artist = artist, thumbnailUrl = null, fromAutoplay = false),
+                lines.take(200).joinToString("\n") { it.text },
+            )
         }
     }
 

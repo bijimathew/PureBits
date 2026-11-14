@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="song_language">Song language</string>
+    <string name="language_all">All</string>
+    <string name="language_search">Find a language</string>
+    <string name="language_automatic">Automatic · %1$s</string>
+    <string name="language_filter_help">Change a song’s language from its menu. Play and Shuffle use this filter.</string>
+    <string name="language_detecting">Checking available lyrics… You can correct any song from its menu.</string>
+    <string name="language_picker_help">Detected from lyrics when available, with Japanese and Malayalam title hints. Translated titles and mixed languages may need a correction. This applies to Downloads and Liked Songs.</string>
+    <string name="language_no_matches">No songs in this language yet. Try All or change a song’s language from its menu.</string>
+    <string name="language_autoplay_off">Autoplay is off for this language-filtered queue.</string>
+    <string name="export_saved_downloads">Export existing downloads</string>
+    <string name="export_saved_downloads_help">Copy saved audio to Music/PureBits. WebM copies go to Download/PureBits. Existing app copies are kept.</string>
+    <string name="export_downloads_progress">Copying %1$d of %2$d…</string>
+    <string name="export_downloads_result">Copied: %1$d · Already exported: %2$d · Not exportable: %3$d · Failed: %4$d</string>
+    <string name="export_downloads_permission">Storage permission is needed to save music on this Android version.</string>
+</resources>

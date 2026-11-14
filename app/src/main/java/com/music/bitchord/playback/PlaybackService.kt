@@ -2935,7 +2935,8 @@ class PlaybackService : MediaLibraryService() {
         } else {
             emptyList()
         }
-        val userQueue = upcoming.filter { it.queueTier == QueueTier.USER_QUEUE }.map(MediaItem::toSong)
+        val userQueue = if (source.id?.startsWith(com.music.bitchord.data.SongLanguagePolicy.FILTER_SOURCE_PREFIX) == true) emptyList()
+            else upcoming.filter { it.queueTier == QueueTier.USER_QUEUE }.map(MediaItem::toSong)
         // The old queue's AutoPlay tail is not carried over, as the flat path
         // in [QueueTimeline.buildContextQueue] does not: it was suggested for
         // the music being replaced, and with ten of them already waiting at the
@@ -3185,6 +3186,7 @@ class PlaybackService : MediaLibraryService() {
 
     private fun toggleAutoplayFromNotification() {
         val party = ListenTogether.state.value
+        if (!party.inParty && player?.currentMediaItem?.toSong()?.playbackSourceId?.startsWith(com.music.bitchord.data.SongLanguagePolicy.FILTER_SOURCE_PREFIX) == true) return
         val enabled = if (party.inParty) !party.playback.autoplayEnabled else !AppSettings.autoplay.value
         AppSettings.setAutoplay(enabled)
         if (party.inParty) {
@@ -3448,7 +3450,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** @see autoplayEnabledFor — shared with the player, which draws the toggle. */
     private fun autoplayEnabled(party: ListenTogether.State): Boolean =
-        autoplayEnabledFor(party, AppSettings.autoplay.value)
+        autoplayEnabledFor(party, AppSettings.autoplay.value, player?.currentMediaItem?.toSong()?.playbackSourceId)
 
     /**
      * Takes back what AutoPlay queued and hasn't played yet — what switching
@@ -8256,6 +8258,7 @@ class PlaybackService : MediaLibraryService() {
                     updateLyricSubtitle()
                 }
             }
+            lines?.let { com.music.bitchord.data.SongLanguages.learnFromLyrics(currentSong, it.take(200).joinToString("\n") { line -> line.text }) }
         }
     }
 

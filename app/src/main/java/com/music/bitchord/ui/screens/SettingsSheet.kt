@@ -633,8 +633,11 @@ fun SettingsScreen(
                     title = exportDownloadsTitle,
                     checked = exportDownloads,
                     onCheckedChange = AppSettings::setExportDownloads,
-                    subtitle = "Music/BitChord".takeIf { exportDownloads },
+                    subtitle = "Music/${com.music.bitchord.download.DownloadStore.FOLDER}".takeIf { exportDownloads },
                 )
+            }
+            row(stringResource(R.string.export_saved_downloads), "music folder", "file manager") {
+                com.music.bitchord.ui.components.DownloadExportControl()
             }
             val syncPlaylistsTitle = stringResource(R.string.sync_downloaded_playlists)
             row(syncPlaylistsTitle, "playlist", "new songs", "background", "automatic") {

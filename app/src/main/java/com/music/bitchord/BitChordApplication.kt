@@ -164,6 +164,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         // What's already saved to Downloads, so the song menu can say so
         // without a media-store query per row.
         Downloads.init(this)
+        com.music.bitchord.data.SongLanguages.init(this)
         // After both of the things a check reads: the setting and the record.
         PlaylistSync.init(this)
         // The device's own listening record. Opened here rather than in

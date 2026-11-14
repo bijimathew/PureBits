@@ -18,22 +18,17 @@ import java.util.Locale
 /**
  * Where a downloaded track goes, and how it gets there.
  *
- * The destination is the device's own Music folder, in a `BitChord`
+ * The destination is the device's own Music folder, in a `PureBits`
  * subfolder — somewhere the file manager lists, other players can open, and a
  * user can back up or delete without going through this app. That choice is
  * what makes this class necessary at all: an app-private directory would be
  * four lines of [File], but a shared one crosses the scoped-storage line and
  * the two sides of that line have nothing in common.
  *
- * It goes through the audio collection rather than Downloads because that is
- * where audio belongs and where every other player on the device looks. What
- * first ruled Downloads out was narrower and is worth keeping on the record:
- * the files were `.webm` then — a container extension Android's own mime table
- * ties to video regardless of what MIME type this class declares for it — and a
- * Gallery app crawling Downloads for video-looking files does not care what a
- * column says otherwise. Nothing writes `.webm` any more (see [storable] and
- * `StreamResolver.resolveForDownload`), so that particular trap is behind us;
- * the conclusion it led to is still the right one.
+ * Compatible audio goes through the audio collection. Exporting an older WebM
+ * file uses Download/PureBits and the Downloads collection: Android associates
+ * that container with video and rejects it in Music, even for audio-only files.
+ * Exporting keeps the original bytes; it does not rename or transcode WebM.
  *
  *  - **API 29+** goes through [MediaStore]. There is no filesystem path to
  *    write to; the store mints a row, hands back a content uri, and the file
@@ -56,7 +51,7 @@ object DownloadStore {
     private const val TAG = "BitChord"
 
     /** The subfolder of Music that everything lands in. */
-    const val FOLDER = "BitChord"
+    const val FOLDER = "PureBits"
 
     private val relativePath = "${Environment.DIRECTORY_MUSIC}/$FOLDER"
 
@@ -168,8 +163,9 @@ object DownloadStore {
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             arrayOf(MediaStore.MediaColumns._ID),
             "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND " +
-                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
-            arrayOf(name, "%$FOLDER%"),
+                "${MediaStore.MediaColumns.RELATIVE_PATH} IN (?, ?, ?, ?) AND " +
+                "${MediaStore.MediaColumns.IS_PENDING} = 0",
+            arrayOf(name, relativePath, "$relativePath/", "${Environment.DIRECTORY_MUSIC}/BitChord", "${Environment.DIRECTORY_MUSIC}/BitChord/"),
             null,
         )?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
@@ -246,12 +242,13 @@ object DownloadStore {
                 )
                 return Uri.fromFile(target)
             }
-            context.contentResolver.update(
+            val published = context.contentResolver.update(
                 uri,
                 ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
                 null,
                 null,
             )
+            check(published > 0) { "Could not publish $name" }
             return uri
         }
 
@@ -268,8 +265,14 @@ object DownloadStore {
      *   made — a failure worth surfacing, since every one of them means the
      *   download cannot start rather than that it might not finish.
      */
-    fun begin(context: Context, name: String, mimeType: String): Pending {
-        if (!AppSettings.exportDownloads.value) {
+    fun begin(
+        context: Context,
+        name: String,
+        mimeType: String,
+        public: Boolean = AppSettings.exportDownloads.value,
+        downloadsCollection: Boolean = false,
+    ): Pending {
+        if (!public) {
             val target = privateFile(context, name)
             val folder = target.parentFile ?: error("No download folder")
             if (!folder.exists() && !folder.mkdirs()) error("Could not create ${folder.path}")
@@ -281,7 +284,7 @@ object DownloadStore {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, if (downloadsCollection) "${Environment.DIRECTORY_DOWNLOADS}/$FOLDER" else relativePath)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             // A MIME type the audio collection doesn't recognise is not a null
@@ -292,7 +295,8 @@ object DownloadStore {
             // means one of those two is wrong about this device — worth saying
             // in those words the first time it happens again.
             val uri = runCatching {
-                context.contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                val collection = if (downloadsCollection) MediaStore.Downloads.EXTERNAL_CONTENT_URI else MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                context.contentResolver.insert(collection, values)
             }.getOrElse { cause ->
                 Log.w(TAG, "the media store refused $mimeType for $name: ${cause.message}")
                 error("Android won't store ${name.substringAfterLast('.', mimeType)} files in Music")
@@ -300,20 +304,29 @@ object DownloadStore {
             return Pending(context, uri, name, part = null, target = null)
         }
 
-        val target = legacyFile(name)
+        val requested = legacyFile(name, if (downloadsCollection) Environment.DIRECTORY_DOWNLOADS else Environment.DIRECTORY_MUSIC)
+        val target = availableFile(requested)
         val folder = target.parentFile ?: error("No Music folder on this device")
         if (!folder.exists() && !folder.mkdirs()) error("Could not create ${folder.path}")
-        val part = File(folder, "$name.part")
-        part.delete()
+        val part = File(folder, ".${target.name}.${java.util.UUID.randomUUID()}.part")
         return Pending(context, Uri.fromFile(target), name, part = part, target = target)
     }
 
     @Suppress("DEPRECATION")
-    private fun legacyFile(name: String) = File(
-        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), FOLDER),
+    private fun legacyFile(name: String, directory: String = Environment.DIRECTORY_MUSIC) = File(
+        File(Environment.getExternalStoragePublicDirectory(directory), FOLDER),
         name,
     )
 
     private fun privateFile(context: Context, name: String) =
         File(File(context.filesDir, "downloads"), name)
+
+    internal fun availableFile(requested: File): File {
+        var candidate = requested
+        var number = 1
+        while (candidate.exists()) {
+            candidate = File(requested.parentFile, "${requested.nameWithoutExtension} (${number++}).${requested.extension}")
+        }
+        return candidate
+    }
 }

@@ -27,8 +27,9 @@ const val MAX_QUEUED_AUTOPLAY = 10
  * a listener could sit under "AutoPlay on" getting no suggestions at all, press
  * it, and watch the label stay exactly as it was.
  */
-fun autoplayEnabledFor(party: ListenTogether.State, localPreference: Boolean): Boolean =
-    if (party.inParty) party.playback.autoplayEnabled else localPreference
+fun autoplayEnabledFor(party: ListenTogether.State, localPreference: Boolean, sourceId: String? = null): Boolean =
+    if (party.inParty) party.playback.autoplayEnabled else localPreference &&
+        sourceId?.startsWith(com.music.bitchord.data.SongLanguagePolicy.FILTER_SOURCE_PREFIX) != true
 
 /**
  * The one device in a party that tops the queue up, or null if there is none.

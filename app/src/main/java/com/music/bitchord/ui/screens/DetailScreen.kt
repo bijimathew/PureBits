@@ -1,5 +1,8 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.data.SongLanguages
+import com.music.bitchord.ui.components.SongLanguageFilter
+
 import com.music.bitchord.ui.components.trackArtSize
 import android.os.Build
 import com.music.bitchord.R
@@ -311,6 +314,8 @@ fun DetailScreen(
     onAddSuggested: (Song) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    onLanguageSongClick: ((List<Song>, Int, String) -> Unit)? = null,
+    onLanguageShuffle: ((List<Song>, String) -> Unit)? = null,
     listState: LazyListState = rememberLazyListState(),
     activeShelf: HomeShelf? = null,
     onActiveShelfChange: (HomeShelf?) -> Unit = {},
@@ -458,7 +463,42 @@ fun DetailScreen(
     // Each surviving row still knows where it sat in the full running order, so
     // an album's track numbers stay the album's rather than becoming positions
     // in the filtered list.
-    val matches = remember(songs, query) { songs.matching(query) }
+    val supportsLanguages = page.browseId == "local:downloads" || page.browseId == "VLLM" ||
+        OfflinePlaylists.isLikedPage(page.browseId) || page.browseId == "spotify:playlist:liked"
+    var selectedLanguage by rememberSaveable(page.browseId) { mutableStateOf("") }
+    val languageEntries by SongLanguages.entries.collectAsStateWithLifecycle()
+    val languageRefresh by SongLanguages.refresh.collectAsStateWithLifecycle()
+    val languageNetwork by AppSettings.meteredConnection.collectAsStateWithLifecycle()
+    val languageLyricsEnabled by AppSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val languageSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
+    var detectingLanguages by remember(page.browseId) { mutableStateOf(false) }
+    val languageContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(rawSongs, supportsLanguages, languageRefresh, languageNetwork, languageLyricsEnabled, languageSources) {
+        if (supportsLanguages) {
+            detectingLanguages = true
+            try { SongLanguages.detectAll(languageContext, rawSongs) }
+            finally { detectingLanguages = false }
+        }
+    }
+    val languageActive = supportsLanguages && selectedLanguage.isNotEmpty()
+    val languageCounts = remember(rawSongs, languageEntries, supportsLanguages) {
+        if (supportsLanguages) rawSongs.groupingBy { SongLanguages.language(it, languageEntries) }.eachCount() else emptyMap()
+    }
+    val matches = remember(songs, query, languageActive, selectedLanguage, languageEntries) {
+        songs.matching(query).filter { !languageActive || SongLanguages.language(it.value, languageEntries) == selectedLanguage }
+    }
+    val playVisible: (List<Song>, Int) -> Unit = { tracks, index ->
+        if (tracks.isNotEmpty()) {
+            if (languageActive && onLanguageSongClick != null) onLanguageSongClick(tracks, index, selectedLanguage)
+            else onSongClick(tracks, index)
+        }
+    }
+    val shuffleVisible: (List<Song>) -> Unit = { tracks ->
+        if (tracks.isNotEmpty()) {
+            if (languageActive && onLanguageShuffle != null) onLanguageShuffle(tracks, selectedLanguage)
+            else onShuffle(tracks)
+        }
+    }
     // What a tap plays: the filtered set of tracks currently standing in the
     // list. When no filter is active, matches contains the full running order
     // and plays the complete release/playlist from the tapped position.
@@ -594,14 +634,26 @@ fun DetailScreen(
                         fullBleed = fullBleedSleeve,
                         canvas = canvas,
                         songs = songs,
-                        onPlay = { onSongClick(songs, 0) },
-                        onShuffle = { onShuffle(songs) },
+                        onPlay = { playVisible(if (languageActive) queue else songs, 0) },
+                        onShuffle = { shuffleVisible(if (languageActive) queue else songs) },
                         // A folder's credit says where its tracks live, not who made them.
                         onArtistClick = onArtistClick.takeIf { folder == null },
                         onToggleLibrary = onToggleLibrary,
                         onDownloadAll = folder?.onDownload?.let { download -> { download(songs) } },
                     )
                 }
+            }
+
+            if (supportsLanguages) {
+                item(key = "song-languages") {
+                    SongLanguageFilter(languageCounts, selectedLanguage, {
+                        selectedLanguage = it
+                        folder?.state?.clear()
+                    }, detectingLanguages)
+                }
+            }
+            if (page.browseId == "local:downloads") {
+                item(key = "export-downloads") { com.music.bitchord.ui.components.DownloadExportControl() }
             }
 
             if (searching) {
@@ -717,9 +769,10 @@ fun DetailScreen(
                         palette = palette,
                         currentSong = currentSong,
                         isPlaying = isPlaying,
-                        onSongClick = onSongClick,
+                        onSongClick = playVisible,
                         onSongLongPress = onSongLongPress,
                         onSongSwipe = onSongSwipe,
+                        songsOnly = languageActive,
                     )
                 } else if (isArtist) {
                     // An artist's full song list would bury the album shelves, so
@@ -767,7 +820,7 @@ fun DetailScreen(
                     val isCurrentRow = playingRowMatcher(matches.map { it.value }, currentSong)
                     if (matches.isEmpty() && state.data.isNotEmpty()) {
                         item(key = "no-matches") {
-                            MessageState(stringResource(R.string.nothing_matches, query))
+                            MessageState(if (languageActive && query.isBlank()) stringResource(R.string.language_no_matches) else stringResource(R.string.nothing_matches, query))
                         }
                     }
                     itemsIndexed(
@@ -783,7 +836,7 @@ fun DetailScreen(
                                 song.copy(thumbnailUrl = song.thumbnailUrl ?: page.thumbnailUrl)
                             },
                             onClick = {
-                                onSongClick(queue, position)
+                                playVisible(queue, position)
                             },
                             onLongPress = { onSongLongPress(song) },
                             onSwipeToQueue = { onSongSwipe(song) },

@@ -776,7 +776,6 @@ private fun BitChordApp(
     // switch was on sat under "AutoPlay on" in a party that had it off, got no
     // suggestions, and pressing the button appeared to do nothing, because it
     // turned the party's setting on while the label already said so.
-    val autoplayEnabled = autoplayEnabledFor(partyState, autoplay)
     val partyServerStatus by ListenTogether.serverConnectionState.collectAsStateWithLifecycle()
     val listenBrainzToken by AppSettings.listenBrainzToken.collectAsStateWithLifecycle()
     // Set each time the search tab is tapped, which SearchScreen uses as a
@@ -1095,6 +1094,7 @@ private fun BitChordApp(
     }
     val controller = rememberMediaController()
     val player = rememberPlayerState(controller)
+    val autoplayEnabled = autoplayEnabledFor(partyState, autoplay, player.song?.playbackSourceId)
     // A music video's picture follows this controller's clock — see [MusicVideoEngine].
     DisposableEffect(controller) {
         MusicVideoEngine.attach(controller)
@@ -1575,7 +1575,7 @@ private fun BitChordApp(
                     c.playBoundedContext(songs, index, source, continuationToken)
                 } else {
                     val result = QueueCoordinator.buildContextQueue(
-                        currentTimeline = currentTimeline,
+                        currentTimeline = if (source.id?.startsWith(com.music.bitchord.data.SongLanguagePolicy.FILTER_SOURCE_PREFIX) == true) emptyList() else currentTimeline,
                         currentIndex = currentIndex,
                         newContextSongs = songs,
                         selectedIndex = index,
@@ -2649,7 +2649,9 @@ private fun BitChordApp(
             onToggleAutoplay = {
                 // PlaybackService owns the setting and queue extension so
                 // this path and the notification use exactly one loader.
-                controller?.toggleAutoplay()
+                if (!partyState.inParty && player.song?.playbackSourceId?.startsWith(com.music.bitchord.data.SongLanguagePolicy.FILTER_SOURCE_PREFIX) == true) {
+                    Toast.makeText(context, R.string.language_autoplay_off, Toast.LENGTH_SHORT).show()
+                } else controller?.toggleAutoplay()
             },
             onJumpTo = { index ->
                 controller?.let { c ->
@@ -2733,7 +2735,7 @@ private fun BitChordApp(
                 val sourceTitle = displayedSong.playbackSource
                     ?: displayedSong.albumName
                     ?: queueLabel
-                val sourceId = displayedSong.playbackSourceId
+                val sourceId = com.music.bitchord.data.SongLanguagePolicy.browseId(displayedSong.playbackSourceId)
 
                 // A context link is navigation, not another page stacked over
                 // Now Playing. Clear the current route before restoring it.
@@ -3239,7 +3241,7 @@ private fun BitChordApp(
                             // handoff, cancel that fill and use the newest complete
                             // page snapshot; Cast deliberately keeps the old full
                             // queue path.
-                            fun playDetailSongs(songs: List<Song>, index: Int) {
+                            fun playDetailSongs(songs: List<Song>, index: Int, language: String = "") {
                                 // Do not cancel a page's fill-in merely because a
                                 // listener tapped while the host owns playback.
                                 if (ListenTogether.state.value.controlsLocked) {
@@ -3247,15 +3249,15 @@ private fun BitChordApp(
                                     return
                                 }
                                 val source = QueueSource(
-                                    page.title,
+                                    if (language.isEmpty()) page.title else page.title + " · " + com.music.bitchord.data.SongLanguagePolicy.label(language),
                                     PlaybackSourceType.BROWSE,
-                                    page.browseId,
+                                    if (language.isEmpty()) page.browseId else com.music.bitchord.data.SongLanguagePolicy.FILTER_SOURCE_PREFIX + language + ":" + page.browseId,
                                 )
                                 val selected = songs.getOrNull(index)
                                 val pageSongKeys =
                                     (page.songs as? UiState.Success)?.data.orEmpty().mapTo(HashSet()) { it.contextEntryKey() }
                                 val useBounded =
-                                    (page.type == BrowseType.ALBUM || page.type == BrowseType.PLAYLIST) &&
+                                    language.isEmpty() && (page.type == BrowseType.ALBUM || page.type == BrowseType.PLAYLIST) &&
                                         selected?.contextEntryKey()?.let(pageSongKeys::contains) == true &&
                                         !CastController.state.value.casting
                                 val latestPage = if (useBounded) {
@@ -3277,7 +3279,7 @@ private fun BitChordApp(
                                     queueIndex.coerceIn(queue.indices),
                                     source,
                                     boundedContext = useBounded,
-                                    continuationToken = latestPage?.continuation ?: page.continuation,
+                                    continuationToken = if (language.isEmpty()) latestPage?.continuation ?: page.continuation else null,
                                 )
                             }
                             // This page's songs being rearranged, drawn in place of its list.
@@ -3294,7 +3296,14 @@ private fun BitChordApp(
                                 },
                                 // Album/playlist playback hands the page snapshot to
                                 // the service, which then owns continuation loading.
-                                onSongClick = ::playDetailSongs,
+                                onSongClick = { songs, index -> playDetailSongs(songs, index) },
+                                onLanguageSongClick = { songs, index, language -> playDetailSongs(songs, index, language) },
+                                onLanguageShuffle = { songs, language ->
+                                    if (songs.isNotEmpty()) {
+                                        QueueShuffle.enableForNextQueue()
+                                        playDetailSongs(songs, songs.indices.random(), language)
+                                    }
+                                },
                                 onSongLongPress = { openSongMenu(withAlbum(it)) },
                                 onSongSwipe = { onSongSwipe(withAlbum(it)) },
                                 onShuffle = { songs ->

@@ -9,6 +9,8 @@
    because they hold the same credentials in cleartext.
 -->
 <full-backup-content>
+    <!-- Public export URIs belong to this device; language corrections remain backed up. -->
+    <exclude domain="sharedpref" path="purebits_download_exports.xml" />
     <exclude domain="sharedpref" path="bitchord_auth.xml" />
     <exclude domain="sharedpref" path="bitchord_auth_plain.xml" />
     <exclude domain="sharedpref" path="bitchord_sources.xml" />

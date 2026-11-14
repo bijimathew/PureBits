@@ -718,6 +718,7 @@ object Downloads {
                 it + mapOf(asked.videoId to metaAsked, fetched.videoId to metaFetched)
             },
         )
+        com.music.bitchord.data.SongLanguages.onDownloadRecorded(asked)
     }
 
     /**

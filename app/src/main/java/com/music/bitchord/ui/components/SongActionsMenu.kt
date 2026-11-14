@@ -186,6 +186,9 @@ fun SongActionsMenu(
     resolvingLinks: Boolean = false,
 ) {
     var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
+    var showingLanguage by remember(song.videoId) { mutableStateOf(false) }
+    val languageEntries by com.music.bitchord.data.SongLanguages.entries.collectAsStateWithLifecycle()
+    if (showingLanguage) SongLanguageDialog(song) { showingLanguage = false }
     var pickingSleepTimer by remember { mutableStateOf(false) }
     // A menu has no pages to swap, so Song Info opens as a dialog.
     if (showingSongInfo) SongInfoDialog(song) { showingSongInfo = false }
@@ -374,6 +377,12 @@ fun SongActionsMenu(
         ActionRow(SfIcons.Info, stringResource(R.string.song_info), accent = palette.accent) {
             showingSongInfo = true
         }
+        ActionRow(
+            SfIcons.Language,
+            stringResource(R.string.song_language),
+            value = com.music.bitchord.data.SongLanguagePolicy.label(com.music.bitchord.data.SongLanguages.language(song, languageEntries)),
+            accent = palette.accent,
+        ) { showingLanguage = true }
 
         // The player's own: about the track playing right now rather than
         // about the song as a thing in a library.
