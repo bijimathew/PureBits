@@ -67,7 +67,7 @@ object AppUpdateChecker {
 
     suspend fun check() = withContext(Dispatchers.IO) {
         // Published production APKs cannot update the separately installed Dev app.
-        if (BuildConfig.APPLICATION_ID != "com.music.bitchord") return@withContext
+        if (BuildConfig.APPLICATION_ID != "com.music.purebits") return@withContext
         runCatching {
             val request = Request.Builder().url(LATEST_RELEASE_URL).build()
             val body = Http.client.newCall(request).execute().use { response ->
