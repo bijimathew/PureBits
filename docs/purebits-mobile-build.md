@@ -76,6 +76,43 @@ Actions secrets. A fork needs those signing secrets for that workflow to pass;
 the local unsigned fallback does not apply to an empty CI keystore. The Check
 workflow builds a dev APK and can run without release-signing secrets.
 
+## PureBits release updates
+
+The production app checks `bijimathew/PureBits` GitHub Releases on launch.
+Update notes, the release-page link and APK downloads come from that repository;
+there is no fallback to BitChord releases. The separately installed Dev app does
+not offer production updates.
+
+Publish a normal, public GitHub release with a numeric tag such as `2.5` or
+`v2.5`. Increase both version values in root `build.gradle.kts`, and keep the
+version name consistent with the tag. Attach APKs signed with the existing
+production key. The updater accepts the current Gradle output names:
+
+- `app-prod-universal-release.apk`
+- `app-prod-arm64-v8a-release.apk`
+- `app-prod-armeabi-v7a-release.apk`
+- `app-prod-x86_64-release.apk`
+
+It also accepts `PureBits-v2.5.apk`, `PureBits-2.5.apk`, and their `_ABI`
+variants (for example `PureBits-v2.5_arm64-v8a.apk`). Universal is preferred;
+otherwise the device's supported ABI order is used. Debug, unsigned and unrelated
+filenames are excluded. If no compatible asset is found, the dialog opens your
+release page instead. GitHub Actions build artifacts alone are not releases.
+Private repositories require an authenticated update service; do not embed a
+personal GitHub token in the app.
+
+Existing installed APKs retain their old updater until a build containing this
+change is installed manually. Creating a release does not modify an already
+installed APK's update source.
+
+Validation: `:app:testDevDebugUnitTest --tests
+com.music.bitchord.data.AppUpdateCheckerTest` passed all five updater tests on
+16 November 2026, covering the published filenames, ABI ordering, alternate
+PureBits names, rejected builds and incomplete uploads. The public `2.4` release
+was reachable without authentication and contained the documented Gradle APK
+names. Root build values were subsequently updated to 2.4/code 44 to match the
+existing release tag. No new APK was packaged for this updater-only check.
+
 ## PB logo and language UI verification, 16 November 2026
 
 With JDK 21, `:app:assembleDevDebug :app:assembleProdRelease` completed

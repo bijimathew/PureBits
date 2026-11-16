@@ -20,7 +20,7 @@ import okhttp3.Request
 import java.io.File
 
 /**
- * BitChord ships as a sideloaded APK off GitHub Releases rather than through
+ * PureBits ships as a sideloaded APK off GitHub Releases rather than through
  * a store, so there's nothing to push an update notice on its own — this
  * polls the repo's "latest release" once per launch and compares its tag
  * against the running build.
@@ -43,7 +43,7 @@ object AppUpdateChecker {
     private const val CACHE_SUBDIR = "updates"
 
     private const val LATEST_RELEASE_URL =
-        "https://api.github.com/repos/kushagrasinghx/BitChord/releases/latest"
+        "https://api.github.com/repos/bijimathew/PureBits/releases/latest"
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -66,6 +66,8 @@ object AppUpdateChecker {
     private var downloadCancelled = false
 
     suspend fun check() = withContext(Dispatchers.IO) {
+        // Published production APKs cannot update the separately installed Dev app.
+        if (BuildConfig.APPLICATION_ID != "com.music.bitchord") return@withContext
         runCatching {
             val request = Request.Builder().url(LATEST_RELEASE_URL).build()
             val body = Http.client.newCall(request).execute().use { response ->
@@ -74,7 +76,7 @@ object AppUpdateChecker {
             val release = json.parseToJsonElement(body) as? JsonObject ?: return@runCatching
             val tag = release["tag_name"]?.jsonPrimitive?.contentOrNull ?: return@runCatching
             val url = release["html_url"]?.jsonPrimitive?.contentOrNull ?: return@runCatching
-            val apkUrl = apkAssetUrl(release)
+            val apkUrl = apkAssetUrl(release, Build.SUPPORTED_ABIS.toList())
             val notes = release["body"]?.jsonPrimitive?.contentOrNull
             val latest = tag.removePrefix("v")
             if (isNewer(latest, BuildConfig.VERSION_NAME)) {
@@ -94,36 +96,32 @@ object AppUpdateChecker {
     }
 
     /**
-     * One release carries the phone app and the TV app, each as a universal
-     * APK plus per-ABI splits:
-     *
-     *     BitChord-v1.8.apk     BitChord-v1.8_arm64-v8a.apk     ...
-     *     BitChordTV-v1.8.apk   BitChordTV-v1.8_arm64-v8a.apk   ...
-     *
-     * so this app's APKs are the ones named with its own
-     * [BuildConfig.UPDATE_APK_PREFIX] — "BitChord-" never matches a TV file,
-     * since the prefix ends at the hyphen. The universal build (no `_ABI`
-     * suffix) is taken first, as it installs anywhere; failing that, the split
-     * for this device's ABI. A release with neither leaves
-     * [UpdateInfo.apkUrl] null and the UI falls back to opening the releases
-     * page.
+     * Accept production Gradle filenames and PureBits-vVERSION[_ABI].apk names.
+     * Exact names exclude debug, unsigned, TV and unrelated APKs.
+     * Prefer universal, then the device's ABIs in their supported order.
      */
-    private fun apkAssetUrl(release: JsonObject): String? = runCatching {
+    internal fun apkAssetUrl(release: JsonObject, supportedAbis: List<String>): String? = runCatching {
+        val tag = release["tag_name"]?.jsonPrimitive?.contentOrNull ?: return null
+        val version = tag.removePrefix("v")
         val apks = release["assets"]?.jsonArray
             ?.mapNotNull { it as? JsonObject }
             ?.mapNotNull { asset ->
+                if (asset["state"]?.jsonPrimitive?.contentOrNull != "uploaded") return@mapNotNull null
                 val name = asset["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                 val url = asset["browser_download_url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val ours = name.startsWith(BuildConfig.UPDATE_APK_PREFIX, ignoreCase = true) &&
-                    name.endsWith(".apk", ignoreCase = true) &&
-                    asset["state"]?.jsonPrimitive?.contentOrNull == "uploaded"
-                if (ours) name.removeSuffix(".apk").removeSuffix(".APK") to url else null
+                name.lowercase() to url
+            }.orEmpty().toMap()
+        val names = buildList {
+            add("app-prod-universal-release.apk")
+            add("PureBits-v$version.apk")
+            add("PureBits-$version.apk")
+            for (abi in supportedAbis) {
+                add("app-prod-$abi-release.apk")
+                add("PureBits-v${version}_$abi.apk")
+                add("PureBits-${version}_$abi.apk")
             }
-            .orEmpty()
-        apks.firstOrNull { (name, _) -> '_' !in name }?.second
-            ?: Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi ->
-                apks.firstOrNull { (name, _) -> name.endsWith("_$abi") }?.second
-            }
+        }
+        names.firstNotNullOfOrNull { apks[it.lowercase()] }
     }.getOrNull()
 
     /**
@@ -142,7 +140,7 @@ object AppUpdateChecker {
             val dir = File(context.cacheDir, CACHE_SUBDIR).apply { mkdirs() }
             // Drop anything left over from an earlier attempt.
             dir.listFiles()?.forEach { it.delete() }
-            val target = File(dir, "bitchord-${info.version}.apk")
+            val target = File(dir, "purebits-update.apk")
 
             val request = Request.Builder().url(url).build()
             Http.client.newCall(request).execute().use { response ->
