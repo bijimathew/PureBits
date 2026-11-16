@@ -1,5 +1,5 @@
 // Adapted from AutoMix's src/lib/engine/deck.ts (https://github.com/heydavidf/automix),
-// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.md.
+// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.
 //
 // BitChord: AutoMix's own deck (signalsmith-stretch over decoded audio), used
 // for the loop mix only. It plays a decoded region of a track, so it can loop

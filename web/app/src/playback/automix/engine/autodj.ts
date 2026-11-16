@@ -1,5 +1,5 @@
 // Adapted from AutoMix's src/lib/engine/autodj.ts (https://github.com/heydavidf/automix),
-// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.md.
+// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.
 //
 // BitChord: AutoMix picks every next track from a local library. Here the
 // queue decides what comes next, as on the phone, and only the playing and

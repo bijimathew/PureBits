@@ -1,5 +1,5 @@
 // From AutoMix (https://github.com/heydavidf/automix), Copyright (C) 2026 David Finnegan.
-// AGPL-3.0-only: see ../LICENSE and ../NOTICE.md in playback/automix.
+// AGPL-3.0-only: see ../LICENSE and ../NOTICE in playback/automix.
 
 // BitChord: module form, mapped in tsconfig paths (TypeScript 7 resolves the
 // package's .mjs ahead of an ambient declare module).

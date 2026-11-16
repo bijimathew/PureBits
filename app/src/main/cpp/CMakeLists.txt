@@ -66,7 +66,7 @@ target_link_options(bitchord_loopmix PRIVATE "-Wl,-z,max-page-size=16384")
 
 # DSD playback (DSF/DFF). The decimator turns 1-bit DSD into float PCM for
 # DsdExtractor; DST is the lossless compression SACD rips use inside DFF.
-# DST is LGPL (see dsd/dst/NOTICE.md), so it is a library of its own that can
+# DST is LGPL (see dsd/dst/NOTICE), so it is a library of its own that can
 # be rebuilt or swapped without touching the rest.
 add_library(bitchord_dsd SHARED dsd/dsd_decimator.cpp)
 target_compile_options(bitchord_dsd PRIVATE -O3 -fno-fast-math -ffp-contract=off -fvisibility=hidden)

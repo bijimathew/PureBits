@@ -1,5 +1,5 @@
 // Adapted from AutoMix's src/lib/engine/deck.ts (https://github.com/heydavidf/automix),
-// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.md.
+// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.
 //
 // BitChord: AutoMix's deck is a signalsmith-stretch worklet over a decoded
 // buffer. Here it is one of the player's two <audio> elements (Shaka-fed),

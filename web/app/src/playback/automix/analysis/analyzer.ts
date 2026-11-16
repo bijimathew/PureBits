@@ -1,5 +1,5 @@
 // Adapted from AutoMix's src/lib/analysis/analyzer.ts (https://github.com/heydavidf/automix),
-// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.md.
+// Copyright (C) 2026 David Finnegan. AGPL-3.0-only: see ../LICENSE and ../NOTICE.
 // BitChord: the audio comes from YouTube (fetchTrackAudio) instead of a local
 // file, the queue is keyed by video id and takes priorities, and results are
 // kept in memory as well as IndexedDB so the mix loop can read them synchronously.
