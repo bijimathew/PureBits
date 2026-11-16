@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.replay
 
+import com.music.bitchord.ui.components.rememberPureBitsLogoPainter
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -36,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.sharedui.resources.*
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import com.music.bitchord.ui.player.MeshGradientBackground
 import com.music.bitchord.ui.player.rememberArtworkColors
@@ -146,7 +147,7 @@ fun ReplayCreditCard(
                 )
                 Spacer(Modifier.width(10.dp))
                 Icon(
-                    painter = painterResource(Res.drawable.ic_logo),
+                    painter = rememberPureBitsLogoPainter(),
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(width = 34.dp, height = 22.dp),

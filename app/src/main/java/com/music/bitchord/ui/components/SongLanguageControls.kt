@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,11 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -26,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -34,24 +39,52 @@ import com.music.bitchord.R
 import com.music.bitchord.data.SongLanguagePolicy
 import com.music.bitchord.data.SongLanguages
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.theme.ArtworkPalette
 
 @Composable
-fun SongLanguageFilter(counts: Map<String, Int>, selected: String, onSelect: (String) -> Unit, detecting: Boolean) {
+fun SongLanguageFilter(
+    counts: Map<String, Int>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    detecting: Boolean,
+    palette: ArtworkPalette,
+) {
     val codes = remember(counts) { SongLanguagePolicy.filterCodes(counts) }
-    Column {
-        Text(stringResource(R.string.song_language), Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.titleSmall)
+    Column(Modifier.padding(bottom = 8.dp)) {
+        if (detecting) Row(
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.language_detecting),
+                style = MaterialTheme.typography.titleSmall,
+                color = palette.onBackground,
+            )
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = palette.onBackground,
+                strokeWidth = 2.dp,
+            )
+        }
         LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(codes) { code ->
+            items(codes, key = { it }) { code ->
                 val label = if (code.isEmpty()) stringResource(R.string.language_all) else SongLanguagePolicy.label(code)
                 val count = if (code.isEmpty()) counts.values.sum() else counts[code] ?: 0
-                FilterChip(selected = selected == code, onClick = { onSelect(code) }, label = { Text("$label ($count)") })
+                FilterChip(
+                    selected = selected == code,
+                    onClick = { onSelect(code) },
+                    label = { Text("$label ($count)") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color.Transparent,
+                        labelColor = palette.onBackground,
+                        selectedContainerColor = palette.onBackground,
+                        selectedLabelColor = palette.background,
+                    ),
+                    border = BorderStroke(1.dp, palette.onBackground.copy(alpha = 0.35f)),
+                )
             }
         }
-        Text(
-            stringResource(if (detecting) R.string.language_detecting else R.string.language_filter_help),
-            Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
-            style = MaterialTheme.typography.bodySmall,
-        )
     }
 }
 

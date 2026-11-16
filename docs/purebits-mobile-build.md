@@ -30,6 +30,12 @@ shared-module tasks must not include `:tv`, `:wearos`, or `bundleWearApk` tasks.
 
 ## Player and home changes
 
+The in-app brand mark uses the user's PB PNG in the Home header, mood badges,
+onboarding and Replay. Existing logo layout sizes are retained. The original PNG
+is kept intact; a shared painter excludes its transparent outer padding and scales
+the source bounds for Android display density. The Replay poster uses the same
+bounds with its nodpi copy of the asset.
+
 Direct USB software volume implementation, verification and hardware checks are
 documented in [the USB investigation](usb-direct-software-volume.md).
 The 2.1 background-silence report and diagnostic changes are covered in
@@ -69,6 +75,21 @@ The existing Android release workflow always creates a keystore from GitHub
 Actions secrets. A fork needs those signing secrets for that workflow to pass;
 the local unsigned fallback does not apply to an empty CI keystore. The Check
 workflow builds a dev APK and can run without release-signing secrets.
+
+## PB logo and language UI verification, 16 November 2026
+
+With JDK 21, `:app:assembleDevDebug :app:assembleProdRelease` completed
+successfully. Both variants retain version 2.3, code 43. The arm64 copies and
+checksums are under `build/outputs/PureBits-2.3-pb-ui-*`; the Dev APK's signature
+was verified, and the production APK is unsigned and requires the existing
+release key.
+
+The x86_64 Dev APK was installed in a temporary, read-only Pixel 7a emulator
+session at 420 dpi. Onboarding, the Home header and mood badges showed the
+complete PB mark inside their existing layout sizes. No crash was reported
+during that check. The emulator had no signed-in library, so the populated
+language-filter screen still needs a phone check. No unit tests or USB playback
+tests were run for these UI-only changes.
 
 ## Local verification, 8 November 2026
 

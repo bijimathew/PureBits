@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.replay
 
+import com.music.bitchord.ui.components.rememberPureBitsLogoPainter
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -56,7 +58,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -414,7 +415,7 @@ private fun StoryChrome(
             )
             // The mark and the word together, the way the card carries it.
             Icon(
-                painter = painterResource(R.drawable.ic_logo),
+                painter = rememberPureBitsLogoPainter(),
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.9f),
                 modifier = Modifier.size(width = 26.dp, height = 17.dp),

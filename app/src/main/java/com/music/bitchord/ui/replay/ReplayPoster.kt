@@ -1,5 +1,11 @@
 package com.music.bitchord.ui.replay
 
+import android.graphics.BitmapFactory
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.graphics.Rect
+import com.music.bitchord.ui.components.PureBitsLogoBounds
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
@@ -692,22 +698,32 @@ private fun drawRuns(
 }
 
 /**
- * The BitChord mark, baseline-aligned with the word beside it.
- *
- * The same vector the app draws everywhere, tinted and given bounds rather than
- * rasterised to a PNG first — a vector drawable renders into an ordinary canvas
- * on every version this app supports, so there is nothing to be gained by
- * keeping a second copy of the logo around at a fixed size.
+ * The PB mark, baseline-aligned with the word beside it. Use the same ink bounds
+ * as the Compose painter so transparent padding cannot shrink the visible mark.
  */
 internal fun drawLogo(canvas: Canvas, context: Context, right: Float, baseline: Float) {
     val logo = runCatching {
-        ResourcesCompat.getDrawable(context.resources, R.drawable.ic_logo, null)
+        BitmapFactory.decodeResource(context.resources, R.drawable.pb_logo)
     }.getOrNull() ?: return
-    val left = right - LOGO_W
-    val top = baseline - LOGO_H
-    logo.setTint(0xE6FFFFFF.toInt())
-    logo.setBounds(left.toInt(), top.toInt(), (left + LOGO_W).toInt(), (top + LOGO_H).toInt())
-    logo.draw(canvas)
+    try {
+        val bounds = PureBitsLogoBounds
+        val scale = minOf(LOGO_W / bounds.WIDTH, LOGO_H / bounds.HEIGHT)
+        val width = bounds.WIDTH * scale
+        val height = bounds.HEIGHT * scale
+        val left = right - LOGO_W + (LOGO_W - width) / 2f
+        val top = baseline - height
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            colorFilter = PorterDuffColorFilter(0xE6FFFFFF.toInt(), PorterDuff.Mode.SRC_IN)
+        }
+        canvas.drawBitmap(
+            logo,
+            Rect(bounds.LEFT, bounds.TOP, bounds.LEFT + bounds.WIDTH, bounds.TOP + bounds.HEIGHT),
+            RectF(left, top, left + width, top + height),
+            paint,
+        )
+    } finally {
+        logo.recycle()
+    }
 }
 
 /** Trims [text] to [width], with an ellipsis, the way a single-line row would. */

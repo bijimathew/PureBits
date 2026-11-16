@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.ui.components.rememberPureBitsLogoPainter
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -354,7 +356,7 @@ private fun TopPickCard(
         }
         if (branded) {
             Icon(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = rememberPureBitsLogoPainter(),
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier
@@ -1612,7 +1614,7 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
             // Picks' own, one card at a time.
             MoodArt(mood, mood.style(), Modifier.fillMaxSize(), square = true, still = true)
             Icon(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = rememberPureBitsLogoPainter(),
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier

@@ -658,7 +658,7 @@ fun DetailScreen(
                     SongLanguageFilter(languageCounts, activeLanguage, {
                         selectedLanguage = it
                         folder?.state?.clear()
-                    }, detectingLanguages)
+                    }, detectingLanguages, palette)
                 }
             }
             if (page.browseId == "local:downloads") {

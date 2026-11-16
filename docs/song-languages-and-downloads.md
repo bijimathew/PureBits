@@ -6,6 +6,10 @@ All. There are no pinned language presets. Unknown appears only while there are
 unclassified songs, and an empty library shows All alone. If a correction or
 deletion removes the last song in a selected language, the filter returns to All.
 The manual correction picker lists languages alphabetically without favorites.
+While detection runs, an **Analyzing…** label and a small spinner appear above
+the chips. They disappear when detection finishes. The separate heading and
+helper paragraph are omitted; chip and indicator colors use the page's artwork
+palette so they remain readable on colored backgrounds.
 Counts cover the loaded songs. Selecting a language narrows the
 song list; Play, Shuffle and row taps start that selection. A language selection
 opens a fresh queue, excludes the old manual queue and does not load unfiltered

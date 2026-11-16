@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.ui.components.trackArtSize
+import com.music.bitchord.ui.components.rememberPureBitsLogoPainter
 import com.music.bitchord.ui.components.contextClick
 import com.music.bitchord.ui.AppUi
 import com.music.bitchord.sharedui.resources.*
@@ -452,13 +453,13 @@ private fun HomeTitle(
             .aspectRatio(LOGO_ASPECT)
         if (festiveLogo) {
             GoldenLogo(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = rememberPureBitsLogoPainter(),
                 modifier = logoModifier,
                 onClick = onFestiveLogoClick,
             )
         } else {
             Icon(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = rememberPureBitsLogoPainter(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = logoModifier,
@@ -476,7 +477,7 @@ private fun HomeTitle(
 /** The wordmark's height against the heading's font size. */
 private const val LOGO_TO_FONT = 0.9f
 
-/** ic_logo's viewport, 730 x 484. */
+/** Preserve the original header slot; the PB painter fits its ink inside it. */
 private const val LOGO_ASPECT = 730f / 484f
 
 /**
