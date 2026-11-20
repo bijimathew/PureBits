@@ -268,9 +268,10 @@ object TrackMatcher {
         // rest of an album name ("Song (Remixes)", "MTV Unplugged") describes
         // the release, and adding it would refuse the right row.
         val albumMarks = albumVersionMarkers(candidate.albumName)
+        val wantedVersions = wanted.versions + languageMarkers(albumVersionMarkers(target.album))
         val effectiveVersions = got.versions + (albumMarks intersect NOVOCAL_TAKES) +
-            (albumMarks intersect wanted.versions)
-        if (wanted.versions != effectiveVersions) return null
+            languageMarkers(albumMarks) + (albumMarks intersect wantedVersions)
+        if (wantedVersions != effectiveVersions) return null
 
         val creditedArtist = artistScore(target.artist, candidate.artist)
         val duration = durationScore(
@@ -528,6 +529,15 @@ object TrackMatcher {
             .filter { it.isNotEmpty() }
         if (words.isEmpty()) return
         if (words.joinToString("") in NEUTRAL_SEGMENTS) return
+        // Language editions are different recordings, even when both listings
+        // merely say "version". Lyrics/subtitle language is packaging, so only
+        // a language by itself or with an audio-edition label qualifies here.
+        val language = LANGUAGE_LABELS[words.filterNot { it in LANGUAGE_EDITION_WORDS }.joinToString(" ")]
+        if (language != null) {
+            versions += language
+            versions += words.filter { it in VERSION_WORDS && it != "version" }
+            return
+        }
         val marks = words.filter { it in VERSION_WORDS }
         if (marks.isNotEmpty()) {
             versions += marks
@@ -998,6 +1008,24 @@ object TrackMatcher {
     private val NOVOCAL_TAKES = setOf(
         "instrumental", "karaoke", "acapella", "acappella", "backing", "stems", "stem",
     )
+
+    // Catalogue language labels, rather than a fixed list of the listener's
+    // preferred languages. Canonical display names also remain useful in queries.
+    private val LANGUAGE_LABELS: Map<String, String> by lazy {
+        buildMap {
+            for (code in Locale.getISOLanguages()) {
+                val locale = Locale.forLanguageTag(code)
+                val name = normalize(locale.getDisplayLanguage(Locale.ENGLISH))
+                    .split(WORD_SPLIT).joinToString(" ") { it.replace(NON_ALNUM, "") }.trim()
+                if (name.isBlank()) continue
+                put(name, name)
+                runCatching { locale.isO3Language }.getOrNull()?.let { put(it, name) }
+            }
+        }
+    }
+    private val LANGUAGE_EDITION_WORDS = setOf("version", "ver", "cover", "dub", "mix", "edition")
+    private fun languageMarkers(markers: Set<String>): Set<String> =
+        markers.filterTo(mutableSetOf()) { it in LANGUAGE_LABELS.values }
 
     /**
      * Asides that read like a version and describe the ordinary release. The

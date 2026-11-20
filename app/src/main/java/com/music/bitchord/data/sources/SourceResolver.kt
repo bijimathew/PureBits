@@ -722,12 +722,15 @@ object SourceResolver {
      * @param budgetMs when to stop and decide on whatever has answered. Bounded
      *   from outside instead, a slow addon used to take every answer with it —
      *   JioSaavn's included — and the download went to YouTube.
+     * @param sources eligible sources supplied by deterministic resolver checks;
+     *   normal downloads use the registry's download permissions and enabled list.
      */
     suspend fun forDownload(
         target: TrackMatcher.Target,
         request: StreamRequest = requestForDownload(),
         keep: suspend (SourceStream) -> SourceStream? = { it },
         budgetMs: Long? = null,
+        sources: List<MusicSource>? = null,
     ): SourceStream? = coroutineScope {
         val until = budgetMs?.let { System.nanoTime() + it * 1_000_000 }
         if (target.title.isBlank()) return@coroutineScope null
@@ -748,7 +751,7 @@ object SourceResolver {
         // has no business deciding that a file saved over Wi-Fi later is a
         // YouTube one. Minus any addon whose manifest says `allowDownloads: 0`:
         // that one plays, but the file comes from whoever is next in line.
-        val active = SourceRegistry.activeForDownload()
+        val active = sources ?: SourceRegistry.activeForDownload()
         // YouTube can be switched off, and a download still goes to it when
         // nothing here answers — the download path never consults this list. So
         // an absent YouTube means everything enabled outranks it, which is
@@ -789,6 +792,9 @@ object SourceResolver {
                 StreamRequest.Best,
                 waitForAll = true,
                 strictLength = strictLength,
+                // A translated cover can have the same title and runtime.
+                // Permanent downloads must not use duration to excuse different credits.
+                requireSharedArtist = true,
                 refine = { _, stream -> keep(stream) },
                 timeoutMs = budgetMs,
             ) { source, stream ->
@@ -819,6 +825,7 @@ object SourceResolver {
                     request,
                     waitForAll = true,
                     strictLength = strictLength,
+                    requireSharedArtist = true,
                 )?.let { keep(it) }
             }
         }
@@ -1210,7 +1217,12 @@ object SourceResolver {
             val strict = strictLength && matchOn.durationSec != null
             var matches = TrackMatcher.ranked(candidates, matchOn)
             if (requireSharedArtist) {
-                matches = matches.filter { TrackMatcher.sharesArtist(matchOn.artist, it.artist) }
+                val credited = matches.filter { TrackMatcher.sharesArtist(matchOn.artist, it.artist) }
+                if (credited.size != matches.size) {
+                    TrackLog.d(TAG, "${source.displayName}: rejected ${matches.size - credited.size} " +
+                        "candidate(s) for '${matchOn.title}' with different or missing artist credits")
+                }
+                matches = credited
             }
             // JioSaavn can return different audio under the same title and
             // artist on different releases. With no album on the requested
